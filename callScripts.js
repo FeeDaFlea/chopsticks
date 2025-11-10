@@ -9,7 +9,7 @@ function callScripts(scriptIndex) {
         }, 1000);
     };
     scriptElement.onerror = () => {
-        console.error(`Error loading script: ${source}`);
+        console.error(`Error loading script: ${scriptElement.src}`);
     };
     document.head.append(scriptElement);
 }
