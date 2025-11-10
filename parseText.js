@@ -1,4 +1,4 @@
-const url = "../rawGTree.txt"
+const url = "./rawGTree.txt"
 let gTree;
 fetch(url)
     .then(result => result.text())
