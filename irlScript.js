@@ -7,7 +7,7 @@ window.onload = async function() {
         vision,
         {
             baseOptions: {
-                modelAssetPath: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/hand_landmarker.task"
+                modelAssetPath: "./hand_landmarker.task"
             },
             numHands: 2
         });
