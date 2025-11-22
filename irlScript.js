@@ -1,4 +1,4 @@
-(async function() {
+window.onload = async function() {
     const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
     );
@@ -14,4 +14,4 @@
     const video = document.getElementById("webcam")
     const stream = await navigator.mediaDevices.getUserMedia({video:true})
     video.srcObject = stream
-})()
+}
