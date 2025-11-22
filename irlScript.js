@@ -6,10 +6,10 @@ window.onload = async function() {
     const handLandmarker = await HandLandmarker.createFromOptions(
         vision,
         {
-        baseOptions: {
-            modelAssetPath: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/hand_landmarker.task"
-        },
-        numHands: 2
+            baseOptions: {
+                modelAssetPath: "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/hand_landmarker.task"
+            },
+            numHands: 2
         });
 
     const video = document.getElementById("webcam")
