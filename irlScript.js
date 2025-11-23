@@ -2,13 +2,18 @@ import {FilesetResolver, HandLandmarker} from "https://cdn.jsdelivr.net/npm/@med
 
 window.onload = async () => {
     function canvasFrame() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save()
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1)
 
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
         const result = handLandmarker.detectForVideo(video, performance.now())
 
         drawLandmarks(ctx, result)
+
+        ctx.restore()
 
         requestAnimationFrame(canvasFrame)
     }
@@ -40,8 +45,6 @@ window.onload = async () => {
         runningMode: "VIDEO",
         numHands: 2
     });
-
-    console.log(handLandmarker)
 
     const video = document.getElementById("webcam")
     const canvas = document.getElementById("outputCanvas")
