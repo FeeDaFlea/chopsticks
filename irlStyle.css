@@ -1,0 +1,9 @@
+#webcam {
+    position:absolute;
+    transform:scaleX(-1);
+    opacity:0;
+}
+
+#gameCanvas {
+    position: fixed;
+}
