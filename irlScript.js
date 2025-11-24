@@ -35,9 +35,25 @@ window.onload = async () => {
         return fingers.filter(elm => elm == 1).length
     }
 
+    function scaleCanvas(videoWidth, videoHeight) {
+        const xScale = window.innerWidth / videoWidth
+        const yScale = window.innerHeight / videoHeight
+        if (yScale * videoWidth <= window.innerWidth) {
+            return {
+                x: yScale * videoWidth,
+                y: yScale * videoHeight
+            }
+        } else {
+            return {
+                x: xScale * videoWidth,
+                y: xScale * videoHeight
+            }
+        }
+    }
+
     function main(ctx, res) {
         for (let hand of res.landmarks){
-            let palm = [hand[0], hand[1], hand[5], hand[9], hand[13], hand[15]]
+            let palm = [hand[0], hand[1], hand[5], hand[9], hand[13], hand[17]]
             let [centroidX, centroidY] = palm.reduce((p, c) => [p[0] + c.x, p[1] + c.y], [0, 0]).map(elm => elm / palm.length)
 
             ctx.beginPath();
@@ -101,8 +117,9 @@ window.onload = async () => {
     video.srcObject = stream
 
     video.onplaying = () => {
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
+        const canvasDimensions = scaleCanvas(video.videoWidth, video.videoHeight)
+        canvas.width = canvasDimensions.x
+        canvas.height = canvasDimensions.y
 
         setTimeout(() => requestAnimationFrame(canvasFrame), 1000)
     }

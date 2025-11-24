@@ -1,6 +1,5 @@
 #webcam {
     position:absolute;
-    transform:scaleX(-1);
     opacity:0;
 }
 
