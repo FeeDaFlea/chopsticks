@@ -5,9 +5,13 @@
     </head>
     <body>
         <video id="webcam" autoplay playsinline></video>
-        <canvas id="outputCanvas"></canvas>
-        <h1 id="left"></h1>
-        <h1 id="right"></h1>
+        <div id="relativeContainer">
+            <canvas id="outputCanvas"></canvas>
+            <div id="overlay">
+                <h1 id="left"></h1>
+                <h1 id="right"></h1>
+            </div>
+        </div>
         <script src="./irlScript.js" type="module"></script>
     </body>
 </html>

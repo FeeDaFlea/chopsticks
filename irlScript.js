@@ -109,6 +109,7 @@ window.onload = async () => {
     const canvas = document.getElementById("outputCanvas")
     const left = document.getElementById("left")
     const right = document.getElementById("right")
+    const relativeContainer = document.getElementById("relativeContainer")
     const ctx = canvas.getContext("2d")
 
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -120,6 +121,7 @@ window.onload = async () => {
         const canvasDimensions = scaleCanvas(video.videoWidth, video.videoHeight)
         canvas.width = canvasDimensions.x
         canvas.height = canvasDimensions.y
+        relativeContainer.style.width = canvasDimensions.x
 
         setTimeout(() => requestAnimationFrame(canvasFrame), 1000)
     }
