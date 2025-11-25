@@ -2,8 +2,6 @@ import {FilesetResolver, HandLandmarker} from "https://cdn.jsdelivr.net/npm/@med
 
 const TIP_IDS = [4, 8, 12, 16, 20]
 
-let LEFT_REST, RIGHT_REST, REST_BUFFER
-
 const LEFT_REST_PERCENT = {
     x: 0.69,
     y: 0.65
@@ -24,16 +22,21 @@ const NODE_KEY = {
     payoff : 6
 }
 
-let gameState = [[1, 1], [1, 1]]
+let LEFT_REST, RIGHT_REST, REST_BUFFER
+
 let leftMoveList = []
 let rightMoveList = []
-let turn = "Player"
-let playerTurn = 2
+
+let playerTurn = 1
 let cpuTurn = playerTurn == 1 ? 2 : 1
 const playerIndex = playerTurn - 1
 const cpuIndex = cpuTurn - 1
 
+let isPaused = false
+let isPlayerTurn = false
+
 let gTree
+let gameState = [[1, 1], [1, 1]]
 
 window.onload = async () => {
     function countFingers(landmarks, rlHand) {
@@ -119,6 +122,18 @@ window.onload = async () => {
         return returnState
     }
 
+    function findBestMove(state) {
+        const nextNodes = gTree.filter(node => 
+            JSON.stringify(node[NODE_KEY.prevGameState]) == JSON.stringify(state) &&
+            node[NODE_KEY.playerTurn] == cpuTurn
+        )
+        const pays = nextNodes.map(node => node[NODE_KEY.payoff])
+        const maxPay = (cpuTurn == 1) ? Math.max(...pays) : Math.min(...pays)
+        const maxPayNextNodes = nextNodes.filter(node => node[NODE_KEY.payoff] == maxPay)
+        const next = maxPayNextNodes[Math.floor(Math.random() * maxPayNextNodes.length)]
+        return next[NODE_KEY.curGameState]
+    }
+
     function calcDist(point1, point2) {
         const xDist = (point1.x - point2.x) ** 2
         const yDist = (point1.y - point2.y) ** 2
@@ -182,69 +197,87 @@ window.onload = async () => {
             "Right"
         )
 
-        if (rFound && lFound) {
-            left.innerHTML = leftFingerCount
-            right.innerHTML = rightFingerCount
-
-            if (calcDist(leftCentroidCoords, LEFT_REST) > REST_BUFFER) { //Left is outside circle
-                if (leftCentroidCoords.x > LEFT_REST.x - REST_BUFFER) { //Hand is to the right or staight up
-                    leftMoveList.push("LL")
-                    if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LL")) {
-                        const newGameState = genGameState(structuredClone(gameState), "LL")
-                        if (valMove(gameState, newGameState)) {
-                            gameState = newGameState
-                            updateUI(gameState)
-                            leftMoveList = []
+        if (!isPaused) {
+            if (isPlayerTurn) {
+                if (rFound && lFound) {
+                    if (calcDist(leftCentroidCoords, LEFT_REST) > REST_BUFFER) { //Left is outside circle
+                        if (leftCentroidCoords.x > LEFT_REST.x - REST_BUFFER) { //Hand is to the right or staight up
+                            leftMoveList.push("LL")
+                            if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LL")) {
+                                const newGameState = genGameState(structuredClone(gameState), "LL")
+                                if (valMove(gameState, newGameState)) {
+                                    gameState = newGameState
+                                    updateUI(gameState)
+                                    leftMoveList = []
+                                    isPlayerTurn = false
+                                    isPaused = true
+                                    setTimeout(() => isPaused = false, 1000)
+                                }
+                            }
+                        } else { //Hand is to the left
+                            leftMoveList.push("LR")
+                            if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LR")) {
+                                const newGameState = genGameState(structuredClone(gameState), "LR")
+                                if (valMove(gameState, newGameState)) {
+                                    gameState = newGameState
+                                    updateUI(gameState)
+                                    leftMoveList = []
+                                    isPlayerTurn = false
+                                    isPaused = true
+                                    setTimeout(() => isPaused = false, 1000)
+                                }
+                            }
                         }
+                    } else { //Left is inside circle
+                        leftMoveList = []
                     }
-                } else { //Hand is to the left
-                    leftMoveList.push("LR")
-                    if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LR")) {
-                        const newGameState = genGameState(structuredClone(gameState), "LR")
-                        if (valMove(gameState, newGameState)) {
-                            gameState = newGameState
-                            updateUI(gameState)
-                            leftMoveList = []
+                    
+                    if (calcDist(rightCentroidCoords, RIGHT_REST) > REST_BUFFER) { //Right is outside
+                        if (rightCentroidCoords.x < RIGHT_REST.x + REST_BUFFER) { //Hand is to the right or straight up
+                            rightMoveList.push("RR")
+                            if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RR")) {
+                                const newGameState = genGameState(structuredClone(gameState), "RR")
+                                if (valMove(gameState, newGameState)) {
+                                    gameState = newGameState
+                                    updateUI(gameState)
+                                    rightMoveList = []
+                                    isPlayerTurn = false
+                                    isPaused = true
+                                    setTimeout(() => isPaused = false, 1000)
+                                }
+                            }
+                        } else { //Hand is to the left
+                            rightMoveList.push("RL")
+                            if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RL")) {
+                                const newGameState = genGameState(structuredClone(gameState), "RL")
+                                if (valMove(gameState, newGameState)) {
+                                    gameState = newGameState
+                                    updateUI(gameState)
+                                    rightMoveList = []
+                                    isPlayerTurn = false
+                                    isPaused = true
+                                    setTimeout(() => isPaused = false, 1000)
+                                }
+                            }
                         }
+                    } else { //Right is inside circle
+                        rightMoveList = []
                     }
                 }
-            } else { //Left is inside circle
-                leftMoveList = []
+            } else { //Computer turn
+                gameState = findBestMove(gameState)
+                isPlayerTurn = true
+                updateUI(gameState)
+                isPaused = true
+                setTimeout(() => isPaused = false, 1000)
             }
-            
-            if (calcDist(rightCentroidCoords, RIGHT_REST) > REST_BUFFER) { //Right is outside
-                if (rightCentroidCoords.x < RIGHT_REST.x + REST_BUFFER) { //Hand is to the right or straight up
-                    rightMoveList.push("RR")
-                    if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RR")) {
-                        const newGameState = genGameState(structuredClone(gameState), "RR")
-                        if (valMove(gameState, newGameState)) {
-                            gameState = newGameState
-                            updateUI(gameState)
-                            rightMoveList = []
-                        }
-                    }
-                } else { //Hand is to the left
-                    rightMoveList.push("RL")
-                    if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RL")) {
-                        const newGameState = genGameState(structuredClone(gameState), "RL")
-                        if (valMove(gameState, newGameState)) {
-                            gameState = newGameState
-                            updateUI(gameState)
-                            rightMoveList = []
-                        }
-                    }
-                }
-            } else { //Right is inside circle
-                rightMoveList = []
-            }
-
-            ctx.beginPath();
-            ctx.arc(leftCentroidCoords.x, leftCentroidCoords.y, 5, 0, 2 * Math.PI);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(rightCentroidCoords.x, rightCentroidCoords.y, 5, 0, 2 * Math.PI);
-            ctx.fill();
         }
+        ctx.beginPath();
+        ctx.arc(leftCentroidCoords.x, leftCentroidCoords.y, 5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(rightCentroidCoords.x, rightCentroidCoords.y, 5, 0, 2 * Math.PI);
+        ctx.fill();
     }
 
     function canvasFrame() {
@@ -319,6 +352,9 @@ window.onload = async () => {
                     y: RIGHT_REST_PERCENT.y * canvasDimensions.y
                 }
                 REST_BUFFER = canvasDimensions.x / 13
+                if (playerTurn == 1) {
+                    isPlayerTurn = true
+                }
                 setTimeout(() => requestAnimationFrame(canvasFrame), 1000)
             })
             .catch(error => {
