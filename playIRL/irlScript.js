@@ -12,10 +12,26 @@ const RIGHT_REST = {
 const REST_BUFFER = 75
 const HIT_BUFFER = 5
 
+const NODE_KEY = {
+    gameRound : 0,
+    playerTurn : 1,
+    prevGameState : 2,
+    curGameState : 3,
+    isEnd : 4,
+    isLoop : 5,
+    payoff : 6
+}
+
 let gameState = [[1, 1], [1, 1]]
 let leftMoveList = []
 let rightMoveList = []
 let turn = "Player"
+let playerTurn = 2
+let cpuTurn = playerTurn == 1 ? 2 : 1
+const playerIndex = playerTurn - 1
+const cpuIndex = cpuTurn - 1
+
+let gTree
 
 window.onload = async () => {
     function countFingers(landmarks, rlHand) {
@@ -51,6 +67,56 @@ window.onload = async () => {
         return fingers.filter(elm => elm == 1).length
     }
 
+    function valFingerCount(count) { 
+        if (count >= 5) {
+            return count - 5
+        } else {
+            return count
+        }
+    }
+
+    function valMove(state, next) {
+        const nextNodes = gTree.filter(node => 
+            JSON.stringify(node[NODE_KEY.prevGameState]) == JSON.stringify(state) && 
+            JSON.stringify(node[NODE_KEY.curGameState]) == JSON.stringify(next)
+        )
+        if (nextNodes.length >= 1) {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    function genGameState(state, move) {
+        let playerHands = state[playerIndex]
+        let cpuHands = state[cpuIndex]
+
+        switch (move) {
+            case "LR":
+                cpuHands[1] += playerHands[0]
+                break
+            case "LL":
+                cpuHands[0] += playerHands[0]
+                break
+            case "RR":
+                cpuHands[1] += playerHands[1]
+                break
+            case "RL":
+                cpuHands[0] += playerHands[1]
+                break  
+        }
+        cpuHands[0] = valFingerCount(cpuHands[0])
+        cpuHands[1] = valFingerCount(cpuHands[1])
+        playerHands[0] = valFingerCount(playerHands[0])
+        playerHands[1] = valFingerCount(playerHands[1])
+
+        let returnState = [[],[]]
+        returnState[playerIndex] = playerHands
+        returnState[cpuIndex] = cpuHands
+
+        return returnState
+    }
+
     function calcDist(point1, point2) {
         const xDist = (point1.x - point2.x) ** 2
         const yDist = (point1.y - point2.y) ** 2
@@ -73,6 +139,13 @@ window.onload = async () => {
                 y: xScale * videoHeight
             }
         }
+    }
+
+    function updateUI(state) {
+        cpuLeft.innerHTML = state[cpuIndex][0]
+        cpuRight.innerHTML = state[cpuIndex][1]
+        left.innerHTML = state[playerIndex][0]
+        right.innerHTML = state[playerIndex][1]
     }
 
     function main(ctx, res) {
@@ -113,42 +186,52 @@ window.onload = async () => {
 
             if (calcDist(leftCentroidCoords, LEFT_REST) > REST_BUFFER) { //Left is outside circle
                 if (leftCentroidCoords.x > LEFT_REST.x - REST_BUFFER) { //Hand is to the left
-                    leftCoords.innerHTML = "LL"
                     leftMoveList.push("LL")
                     if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LL")) {
-                        console.log("LL", leftMoveList)
-                        leftMoveList = []
+                        const newGameState = genGameState(structuredClone(gameState), "LL")
+                        if (valMove(gameState, newGameState)) {
+                            gameState = newGameState
+                            updateUI(gameState)
+                            leftMoveList = []
+                        }
                     }
                 } else { //Hand is straight up or to the right
-                    leftCoords.innerHTML = "LR"
                     leftMoveList.push("LR")
                     if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LR")) {
-                        console.log("LR", leftMoveList)
-                        leftMoveList = []
+                        const newGameState = genGameState(structuredClone(gameState), "LR")
+                        if (valMove(gameState, newGameState)) {
+                            gameState = newGameState
+                            updateUI(gameState)
+                            leftMoveList = []
+                        }
                     }
                 }
             } else {
-                leftCoords.innerHTML = ""
                 leftMoveList = []
             }
             if (calcDist(rightCentroidCoords, RIGHT_REST) > REST_BUFFER) {
                 if (rightCentroidCoords.x < RIGHT_REST.x + REST_BUFFER) { //Hand is to the left
-                    rightCoords.innerHTML = "RR"
                     rightMoveList.push("RR")
                     if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RR")) {
-                        console.log("RR", rightMoveList)
-                        rightMoveList = []
+                        const newGameState = genGameState(structuredClone(gameState), "RR")
+                        if (valMove(gameState, newGameState)) {
+                            gameState = newGameState
+                            updateUI(gameState)
+                            rightMoveList = []
+                        }
                     }
                 } else { //Hand is straight up or to the right
-                    rightCoords.innerHTML = "RL"
                     rightMoveList.push("RL")
                     if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RL")) {
-                        console.log("RL", rightMoveList)
-                        rightMoveList = []
+                        const newGameState = genGameState(structuredClone(gameState), "RL")
+                        if (valMove(gameState, newGameState)) {
+                            gameState = newGameState
+                            updateUI(gameState)
+                            rightMoveList = []
+                        }
                     }
                 }
             } else {
-                rightCoords.innerHTML = ""
                 rightMoveList = []
             }
 
@@ -159,15 +242,6 @@ window.onload = async () => {
             ctx.arc(rightCentroidCoords.x, rightCentroidCoords.y, 5, 0, 2 * Math.PI);
             ctx.fill();
         }
-
-        ctx.beginPath();
-        ctx.arc(LEFT_REST.x, LEFT_REST.y, REST_BUFFER, 0, 2 * Math.PI);
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(RIGHT_REST.x, RIGHT_REST.y, REST_BUFFER, 0, 2 * Math.PI);
-        ctx.lineWidth = 3;
-        ctx.stroke();
     }
 
     function canvasFrame() {
@@ -182,11 +256,16 @@ window.onload = async () => {
 
         if (result.landmarks && result.landmarks.length == 2){ 
             main(ctx, result)
-        } else {
-            left.innerHTML = ""
-            right.innerHTML = ""
         }
 
+        ctx.beginPath();
+        ctx.arc(LEFT_REST.x, LEFT_REST.y, REST_BUFFER, 0, 2 * Math.PI);
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(RIGHT_REST.x, RIGHT_REST.y, REST_BUFFER, 0, 2 * Math.PI);
+        ctx.lineWidth = 3;
+        ctx.stroke();
         ctx.restore()
 
         requestAnimationFrame(canvasFrame)
@@ -209,8 +288,8 @@ window.onload = async () => {
     const left = document.getElementById("left")
     const right = document.getElementById("right")
     const relativeContainer = document.getElementById("relativeContainer")
-    const leftCoords = document.getElementById("compLeft")
-    const rightCoords = document.getElementById("compRight")
+    const cpuLeft = document.getElementById("compLeft")
+    const cpuRight = document.getElementById("compRight")
     const ctx = canvas.getContext("2d")
 
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -219,11 +298,20 @@ window.onload = async () => {
     video.srcObject = stream
 
     video.onplaying = () => {
-        const canvasDimensions = scaleCanvas(video.videoWidth, video.videoHeight)
-        canvas.width = canvasDimensions.x
-        canvas.height = canvasDimensions.y
-        relativeContainer.style.width = canvasDimensions.x
+        fetch("./rawGTree.txt")
+            .then(result => result.text())
+            .then(data => {
+                gTree = JSON.parse(data);
+                const canvasDimensions = scaleCanvas(video.videoWidth, video.videoHeight)
+                canvas.width = canvasDimensions.x
+                canvas.height = canvasDimensions.y
+                relativeContainer.style.width = canvasDimensions.x
+                updateUI(gameState)
 
-        setTimeout(() => requestAnimationFrame(canvasFrame), 1000)
+                setTimeout(() => requestAnimationFrame(canvasFrame), 1000)
+            })
+            .catch(error => {
+                console.log("Error in parsing text: " + error)
+            })
     }
 }
