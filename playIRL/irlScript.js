@@ -1,15 +1,17 @@
 import {FilesetResolver, HandLandmarker} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js"
 
 const TIP_IDS = [4, 8, 12, 16, 20]
-const LEFT_REST = {
-    x: 690,
-    y: 475
+
+let LEFT_REST, RIGHT_REST, REST_BUFFER
+
+const LEFT_REST_PERCENT = {
+    x: 0.69,
+    y: 0.65
 }
-const RIGHT_REST = {
-    x: 320,
-    y: 475
+const RIGHT_REST_PERCENT = {
+    x: 0.32,
+    y: 0.65
 }
-const REST_BUFFER = 75
 const HIT_BUFFER = 5
 
 const NODE_KEY = {
@@ -149,8 +151,8 @@ window.onload = async () => {
     }
 
     function main(ctx, res) {
-        let leftCentroidCoords = {x: null, y:null}
-        let rightCentroidCoords = {x: null, y:null}
+        let leftCentroidCoords = {x: null, y: null}
+        let rightCentroidCoords = {x: null, y: null}
         let rFound = false
         let lFound = false
 
@@ -185,7 +187,7 @@ window.onload = async () => {
             right.innerHTML = rightFingerCount
 
             if (calcDist(leftCentroidCoords, LEFT_REST) > REST_BUFFER) { //Left is outside circle
-                if (leftCentroidCoords.x > LEFT_REST.x - REST_BUFFER) { //Hand is to the left
+                if (leftCentroidCoords.x > LEFT_REST.x - REST_BUFFER) { //Hand is to the right or staight up
                     leftMoveList.push("LL")
                     if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LL")) {
                         const newGameState = genGameState(structuredClone(gameState), "LL")
@@ -195,7 +197,7 @@ window.onload = async () => {
                             leftMoveList = []
                         }
                     }
-                } else { //Hand is straight up or to the right
+                } else { //Hand is to the left
                     leftMoveList.push("LR")
                     if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LR")) {
                         const newGameState = genGameState(structuredClone(gameState), "LR")
@@ -206,11 +208,12 @@ window.onload = async () => {
                         }
                     }
                 }
-            } else {
+            } else { //Left is inside circle
                 leftMoveList = []
             }
-            if (calcDist(rightCentroidCoords, RIGHT_REST) > REST_BUFFER) {
-                if (rightCentroidCoords.x < RIGHT_REST.x + REST_BUFFER) { //Hand is to the left
+            
+            if (calcDist(rightCentroidCoords, RIGHT_REST) > REST_BUFFER) { //Right is outside
+                if (rightCentroidCoords.x < RIGHT_REST.x + REST_BUFFER) { //Hand is to the right or straight up
                     rightMoveList.push("RR")
                     if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RR")) {
                         const newGameState = genGameState(structuredClone(gameState), "RR")
@@ -220,7 +223,7 @@ window.onload = async () => {
                             rightMoveList = []
                         }
                     }
-                } else { //Hand is straight up or to the right
+                } else { //Hand is to the left
                     rightMoveList.push("RL")
                     if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RL")) {
                         const newGameState = genGameState(structuredClone(gameState), "RL")
@@ -231,7 +234,7 @@ window.onload = async () => {
                         }
                     }
                 }
-            } else {
+            } else { //Right is inside circle
                 rightMoveList = []
             }
 
@@ -307,7 +310,15 @@ window.onload = async () => {
                 canvas.height = canvasDimensions.y
                 relativeContainer.style.width = canvasDimensions.x
                 updateUI(gameState)
-
+                LEFT_REST = {
+                    x: LEFT_REST_PERCENT.x * canvasDimensions.x,
+                    y: LEFT_REST_PERCENT.y * canvasDimensions.y
+                }
+                RIGHT_REST = {
+                    x: RIGHT_REST_PERCENT.x * canvasDimensions.x,
+                    y: RIGHT_REST_PERCENT.y * canvasDimensions.y
+                }
+                REST_BUFFER = canvasDimensions.x / 13
                 setTimeout(() => requestAnimationFrame(canvasFrame), 1000)
             })
             .catch(error => {
