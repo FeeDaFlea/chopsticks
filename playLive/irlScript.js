@@ -13,6 +13,7 @@ const RIGHT_REST_PERCENT = {
 const HIT_BUFFER = 5
 const SPLIT_BUFFER = 3
 const CONFIRM_BUFFER = 10
+const START_CONFIRM_BUFFER = 30
 
 const NODE_KEY = {
     gameRound : 0,
@@ -29,20 +30,25 @@ let LEFT_REST, RIGHT_REST, REST_BUFFER
 let leftMoveList = []
 let rightMoveList = []
 let splitHist = []
+let startHist = []
 
-let playerTurn = 1
-let cpuTurn = playerTurn == 1 ? 2 : 1
-const playerIndex = playerTurn - 1
-const cpuIndex = cpuTurn - 1
+let playerTurn, cpuTurn, playerIndex, cpuIndex
 
 let isPaused = false
 let isPlayerTurn = false
 let isSplit = false
+let isStart = true
+let startRound = 0
 
 let gTree
 let gameState = [[1, 1], [1, 1]]
 
 window.onload = async () => {
+    function waitTime(time) {
+        isPaused = true
+        setTimeout(() => isPaused = false, time)
+    }
+
     function countFingers(landmarks, rlHand) {
         let fingers = []
         const justThumb = [1, 0, 0, 0, 0]
@@ -209,7 +215,37 @@ window.onload = async () => {
             "Right"
         )
 
-        if (!isPaused) {
+        if (isStart) {
+            if (startRound == 0) {
+                if (calcDist(leftCentroidCoords, LEFT_REST) < REST_BUFFER && calcDist(rightCentroidCoords, RIGHT_REST) < REST_BUFFER) { //Both are inside
+                    startRound += 1
+                    console.log("START 0")
+                }
+            } else if (startRound == 1) {
+                startHist.push(rightFingerCount)
+                if ((rightFingerCount == 1 || rightFingerCount == 2) && startHist.length >= START_CONFIRM_BUFFER && startHist.slice(-START_CONFIRM_BUFFER).every(elm => elm == rightFingerCount)) {
+                    playerTurn = rightFingerCount
+                    cpuTurn = playerTurn == 1 ? 2 : 1
+                    playerIndex = playerTurn - 1
+                    cpuIndex = cpuTurn - 1
+                    startRound += 1
+                    if (playerTurn == 1) {
+                        isPlayerTurn = true
+                    }
+                    console.log("START 1")
+                }
+            } else {
+                if (calcDist(leftCentroidCoords, LEFT_REST) < REST_BUFFER  //Both are inside
+                && calcDist(rightCentroidCoords, RIGHT_REST) < REST_BUFFER
+                && leftFingerCount == 1 //Both hands only have one finger
+                && rightFingerCount == 1) {
+                    isStart = false
+                    updateUI(gameState)
+                    waitTime(1000)
+                    console.log("GO!")
+                }
+            }
+        } else if (!isPaused) {
             if (isPlayerTurn) {
                 if (rFound && lFound) {
                     if (isSplit) {
@@ -225,8 +261,7 @@ window.onload = async () => {
                                 gameState[playerIndex] = [leftFingerCount, rightFingerCount]
                                 isSplit = false
                                 isPlayerTurn = false
-                                isPaused = true
-                                setTimeout(() => isPaused = false, 1000)
+                                waitTime(1000)
                             }
                         }
                     } else {
@@ -242,8 +277,7 @@ window.onload = async () => {
                                         updateUI(gameState)
                                         leftMoveList = []
                                         isPlayerTurn = false
-                                        isPaused = true
-                                        setTimeout(() => isPaused = false, 1000)
+                                        waitTime(1000)
                                     }
                                 }
                             } else { //Hand is to the left
@@ -257,8 +291,7 @@ window.onload = async () => {
                                         updateUI(gameState)
                                         leftMoveList = []
                                         isPlayerTurn = false
-                                        isPaused = true
-                                        setTimeout(() => isPaused = false, 1000)
+                                        waitTime(1000)
                                     }
                                 }
                             }
@@ -278,8 +311,7 @@ window.onload = async () => {
                                         updateUI(gameState)
                                         rightMoveList = []
                                         isPlayerTurn = false
-                                        isPaused = true
-                                        setTimeout(() => isPaused = false, 1000)
+                                        waitTime(1000)
                                     }
                                 }
                             } else { //Hand is to the left
@@ -293,8 +325,7 @@ window.onload = async () => {
                                         updateUI(gameState)
                                         rightMoveList = []
                                         isPlayerTurn = false
-                                        isPaused = true
-                                        setTimeout(() => isPaused = false, 1000)
+                                        waitTime(1000)
                                     }
                                 }
                             }
@@ -307,16 +338,25 @@ window.onload = async () => {
                 gameState = findBestMove(gameState)
                 isPlayerTurn = true
                 updateUI(gameState)
-                isPaused = true
-                setTimeout(() => isPaused = false, 1000)
+                waitTime(1000)
             }
         }
+        let centroidColor = (isStart) ? (
+                                startRound == 0 ? "white"
+                                : startRound == 1 ? "yellow"
+                                : "white" )
+                            : isSplit ? "purple"
+                            : isPaused ? "gray"
+                            : isPlayerTurn ? "blue"
+                            : "gray"
 
         ctx.beginPath();
         ctx.arc(leftCentroidCoords.x, leftCentroidCoords.y, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = centroidColor
         ctx.fill();
         ctx.beginPath();
         ctx.arc(rightCentroidCoords.x, rightCentroidCoords.y, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = centroidColor
         ctx.fill();
     }
 
@@ -382,7 +422,6 @@ window.onload = async () => {
                 canvas.width = canvasDimensions.x
                 canvas.height = canvasDimensions.y
                 relativeContainer.style.width = canvasDimensions.x
-                updateUI(gameState)
                 LEFT_REST = {
                     x: LEFT_REST_PERCENT.x * canvasDimensions.x,
                     y: LEFT_REST_PERCENT.y * canvasDimensions.y
@@ -392,9 +431,6 @@ window.onload = async () => {
                     y: RIGHT_REST_PERCENT.y * canvasDimensions.y
                 }
                 REST_BUFFER = canvasDimensions.x / 13
-                if (playerTurn == 1) {
-                    isPlayerTurn = true
-                }
                 setTimeout(() => requestAnimationFrame(canvasFrame), 1000)
             })
             .catch(error => {
