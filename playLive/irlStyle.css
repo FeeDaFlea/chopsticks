@@ -3,12 +3,21 @@
     opacity:0;
 }
 
+* {
+    font-family: Inter, sans-serif;
+}
+
+h1 {
+    background-color: #F9F5EC
+}
+
 body {
     display: flex;
     justify-content: center;
     align-items: center;
     margin: 0;
     padding: 0;
+    background-color: #F9F5EC;
 }
 
 #relativeContainer {

@@ -3,17 +3,26 @@ import {FilesetResolver, HandLandmarker} from "https://cdn.jsdelivr.net/npm/@med
 const TIP_IDS = [4, 8, 12, 16, 20]
 
 const LEFT_REST_PERCENT = {
-    x: 0.69,
+    x: 0.70,
     y: 0.65
 }
 const RIGHT_REST_PERCENT = {
-    x: 0.32,
+    x: 0.30,
     y: 0.65
+}
+const LEFT_CPU_PERCENT = {
+    x: 1 - (1 - LEFT_REST_PERCENT.x) / 2,
+    y: 1 - LEFT_REST_PERCENT.y
+}
+const RIGHT_CPU_PERCENT = {
+    x: RIGHT_REST_PERCENT.x / 2,
+    y: 1 - RIGHT_REST_PERCENT.y
 }
 const HIT_BUFFER = 5
 const SPLIT_BUFFER = 3
 const CONFIRM_BUFFER = 10
 const START_CONFIRM_BUFFER = 30
+const ANIMATION_LENGTH = 20
 
 const NODE_KEY = {
     gameRound : 0,
@@ -25,7 +34,7 @@ const NODE_KEY = {
     payoff : 6
 }
 
-let LEFT_REST, RIGHT_REST, REST_BUFFER
+let LEFT_REST, RIGHT_REST, REST_BUFFER, RIGHT_CPU_REST, LEFT_CPU_REST, RIGHT_CPU_ANIMATION, LEFT_CPU_ANIMATION, canvasDimensions
 
 let leftMoveList = []
 let rightMoveList = []
@@ -38,7 +47,16 @@ let isPaused = false
 let isPlayerTurn = false
 let isSplit = false
 let isStart = true
+let isComputerAnimation = false
+let animationToOrFrom = "to"
+let animationType = "hit"
+let xChangeSplit = 0
+let xChangeOpp = 0
+let xChangeSame = 0
+let yChange = 0
+let animationRound = 0
 let startRound = 0
+let nextMove = [[], []]
 
 let gTree
 let gameState = [[1, 1], [1, 1]]
@@ -102,7 +120,39 @@ window.onload = async () => {
         }
     }
 
-    function genGameState(state, move) {
+    function splitOrHit(prevState, curState) {
+        console.log(prevState, curState)
+        let prevCPU = prevState[cpuIndex]
+        let curCPU = curState[cpuIndex]
+
+        if (JSON.stringify(prevCPU) !== JSON.stringify(curCPU)) {
+            return "split"
+        } else {
+            if (prevState[playerIndex][0] !== curState[playerIndex][0]) { //Left was hit
+                console.log(JSON.stringify(genGameStateCPU(structuredClone(prevState), "LL")))
+                if (prevCPU[0] == prevCPU[1]) {
+                    console.log("Same")
+                    const moveList = ["LL", "RL"]
+                    return moveList[Math.floor(Math.random() * moveList.length)]
+                } else if (JSON.stringify(genGameStateCPU(structuredClone(prevState), "LL")) == JSON.stringify(curState)) { //Too fancy. Just use the val move and gen game state
+                    return "LL"
+                } else {
+                    return "RL"
+                }
+            } else {
+                if (prevCPU[0] == prevCPU[1]) {
+                    const moveList = ["LR", "RR"]
+                    return moveList[Math.floor(Math.random() * moveList.length)]
+                } else if (JSON.stringify(genGameStateCPU(structuredClone(prevState), "LR")) == JSON.stringify(curState)) {
+                    return "LR"
+                } else {
+                    return "RR"
+                }                
+            }
+        }
+    }
+
+    function genGameStatePlayer(state, move) {
         let playerHands = state[playerIndex]
         let cpuHands = state[cpuIndex]
 
@@ -130,7 +180,37 @@ window.onload = async () => {
         returnState[cpuIndex] = cpuHands
 
         return returnState
-    }
+    } //Add one for computer
+
+    function genGameStateCPU(state, move) {
+        let playerHands = state[playerIndex]
+        let cpuHands = state[cpuIndex]
+
+        switch (move) {
+            case "LR":
+                playerHands[1] += cpuHands[0]
+                break
+            case "LL":
+                playerHands[0] += cpuHands[0]
+                break
+            case "RR":
+                playerHands[1] += cpuHands[1]
+                break
+            case "RL":
+                playerHands[0] += cpuHands[1]
+                break  
+        }
+        cpuHands[0] = valFingerCount(cpuHands[0])
+        cpuHands[1] = valFingerCount(cpuHands[1])
+        playerHands[0] = valFingerCount(playerHands[0])
+        playerHands[1] = valFingerCount(playerHands[1])
+
+        let returnState = [[],[]]
+        returnState[playerIndex] = playerHands
+        returnState[cpuIndex] = cpuHands
+
+        return returnState
+    } //Add one for computer
 
     function findBestMove(state) {
         const nextNodes = gTree.filter(node => 
@@ -173,6 +253,73 @@ window.onload = async () => {
                 x: xScale * videoWidth,
                 y: xScale * videoHeight
             }
+        }
+    }
+
+    function drawFingers(numFingers, pointX, pointY, fingerLength, color, ctx) {
+        const degreesPerFinger = 90 / numFingers
+        const radPerFinger = degreesPerFinger * Math.PI / 180
+        let runningRad = 0
+        let fingersToDraw = numFingers
+        if (numFingers == 0) return
+
+        if (numFingers % 2 == 0) { //Even
+            let endX = pointX + Math.cos(Math.PI / 2 + radPerFinger / 2) * -fingerLength
+            let endY = pointY + Math.sin(Math.PI / 2 + radPerFinger / 2) * -fingerLength
+
+            ctx.beginPath()
+            ctx.moveTo(pointX, pointY)
+            ctx.lineTo(endX, endY)
+            ctx.lineWidth = 10
+            ctx.strokeStyle = color
+            ctx.stroke()
+
+            endX = pointX + Math.cos(Math.PI / 2 - radPerFinger / 2) * -fingerLength
+            endY = pointY + Math.sin(Math.PI / 2 - radPerFinger / 2) * -fingerLength
+
+            ctx.beginPath()
+            ctx.moveTo(pointX, pointY)
+            ctx.lineTo(endX, endY)
+            ctx.lineWidth = 10
+            ctx.strokeStyle = color
+            ctx.stroke()
+
+            runningRad += radPerFinger / 2
+            fingersToDraw -= 2
+        } else { //odd
+            let endX = pointX + Math.cos(Math.PI / 2) * -fingerLength
+            let endY = pointY + Math.sin(Math.PI / 2) * -fingerLength
+
+            ctx.beginPath()
+            ctx.moveTo(pointX, pointY)
+            ctx.lineTo(endX, endY)
+            ctx.lineWidth = 10
+            ctx.strokeStyle = color
+            ctx.stroke()
+            fingersToDraw -= 1
+        }
+        for (let i = 0; i < fingersToDraw / 2; i ++) {
+            let endX = pointX + Math.cos(Math.PI / 2 + runningRad + radPerFinger) * -fingerLength
+            let endY = pointY + Math.sin(Math.PI / 2 + runningRad + radPerFinger) * -fingerLength
+
+            ctx.beginPath()
+            ctx.moveTo(pointX, pointY)
+            ctx.lineTo(endX, endY)
+            ctx.lineWidth = 10
+            ctx.strokeStyle = color
+            ctx.stroke()
+
+            endX = pointX + Math.cos(Math.PI / 2 - runningRad - radPerFinger) * -fingerLength
+            endY = pointY + Math.sin(Math.PI / 2 - runningRad - radPerFinger) * -fingerLength
+
+            ctx.beginPath()
+            ctx.moveTo(pointX, pointY)
+            ctx.lineTo(endX, endY)
+            ctx.lineWidth = 10
+            ctx.strokeStyle = color
+            ctx.stroke()
+
+            runningRad += radPerFinger
         }
     }
 
@@ -245,18 +392,44 @@ window.onload = async () => {
                     console.log("GO!")
                 }
             }
+        } else if (isComputerAnimation) {
+            animationRound += 1
+            if (animationType == "split") { //Check
+                LEFT_CPU_ANIMATION.x -= xChangeSplit
+                RIGHT_CPU_ANIMATION.x += xChangeSplit
+            } else if (animationType == "RL") {
+                LEFT_CPU_ANIMATION.x -= xChangeOpp
+                LEFT_CPU_ANIMATION.y += yChange
+            } else if (animationType == "LR") {
+                RIGHT_CPU_ANIMATION.x += xChangeOpp
+                RIGHT_CPU_ANIMATION.y += yChange
+            } else if (animationType == "LL") {
+                RIGHT_CPU_ANIMATION.x += xChangeSame
+                RIGHT_CPU_ANIMATION.y += yChange
+            } else {
+                LEFT_CPU_ANIMATION.x -= xChangeSame
+                LEFT_CPU_ANIMATION.y += yChange
+            }
+            if (animationRound >= ANIMATION_LENGTH) {
+                isComputerAnimation = false
+                isPlayerTurn = true
+                animationRound = 0
+                gameState = nextMove
+                updateUI(gameState)
+                waitTime(1000)
+            }
         } else if (!isPaused) {
             if (isPlayerTurn) {
                 if (rFound && lFound) {
                     if (isSplit) {
                         splitHist.push([leftFingerCount, rightFingerCount])
+                        let newGameState = [[], []]
+                        newGameState[cpuIndex] = gameState[cpuIndex]
+                        newGameState[playerIndex] = [leftFingerCount, rightFingerCount]
+                        updateUI(newGameState)
                         if (splitHist.length >= CONFIRM_BUFFER && 
                             splitHist.slice(-CONFIRM_BUFFER).every(elm => JSON.stringify(elm) == JSON.stringify([leftFingerCount, rightFingerCount]))) {
                             splitHist = []
-                            let newGameState = [[], []]
-                            newGameState[cpuIndex] = gameState[cpuIndex]
-                            newGameState[playerIndex] = [leftFingerCount, rightFingerCount]
-                            updateUI(newGameState)
                             if (valMove(gameState, newGameState)) {
                                 gameState[playerIndex] = [leftFingerCount, rightFingerCount]
                                 isSplit = false
@@ -271,7 +444,7 @@ window.onload = async () => {
                                 if (checkSplit()) {
                                     isSplit = true
                                 } else if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LL")) {
-                                    const newGameState = genGameState(structuredClone(gameState), "LL")
+                                    const newGameState = genGameStatePlayer(structuredClone(gameState), "LL")
                                     if (valMove(gameState, newGameState)) {
                                         gameState = newGameState
                                         updateUI(gameState)
@@ -285,7 +458,7 @@ window.onload = async () => {
                                 if (checkSplit()) {
                                     isSplit = true
                                 } else if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LR")) {
-                                    const newGameState = genGameState(structuredClone(gameState), "LR")
+                                    const newGameState = genGameStatePlayer(structuredClone(gameState), "LR")
                                     if (valMove(gameState, newGameState)) {
                                         gameState = newGameState
                                         updateUI(gameState)
@@ -305,7 +478,7 @@ window.onload = async () => {
                                 if (checkSplit()) {
                                     isSplit = true
                                 } else if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RR")) {
-                                    const newGameState = genGameState(structuredClone(gameState), "RR")
+                                    const newGameState = genGameStatePlayer(structuredClone(gameState), "RR")
                                     if (valMove(gameState, newGameState)) {
                                         gameState = newGameState
                                         updateUI(gameState)
@@ -319,7 +492,7 @@ window.onload = async () => {
                                 if (checkSplit()) {
                                     isSplit = true
                                 } else if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RL")) {
-                                    const newGameState = genGameState(structuredClone(gameState), "RL")
+                                    const newGameState = genGameStatePlayer(structuredClone(gameState), "RL")
                                     if (valMove(gameState, newGameState)) {
                                         gameState = newGameState
                                         updateUI(gameState)
@@ -335,10 +508,13 @@ window.onload = async () => {
                     }
                 }
             } else { //Computer turn
-                gameState = findBestMove(gameState)
-                isPlayerTurn = true
-                updateUI(gameState)
-                waitTime(1000)
+                nextMove = findBestMove(gameState)
+                animationType = splitOrHit(gameState, nextMove)
+                isComputerAnimation = true
+                animationToOrFrom = "to"
+                console.log(animationType)
+                LEFT_CPU_ANIMATION = {...LEFT_CPU_REST}
+                RIGHT_CPU_ANIMATION = {...RIGHT_CPU_REST}
             }
         }
         let centroidColor = (isStart) ? (
@@ -354,10 +530,23 @@ window.onload = async () => {
         ctx.arc(leftCentroidCoords.x, leftCentroidCoords.y, 5, 0, 2 * Math.PI);
         ctx.fillStyle = centroidColor
         ctx.fill();
+        ctx.beginPath()
+        ctx.moveTo(LEFT_REST.x, canvasDimensions.y)
+        ctx.lineTo(leftCentroidCoords.x, leftCentroidCoords.y)
+        ctx.lineWidth = 10
+        ctx.strokeStyle = centroidColor
+        ctx.stroke()
+
         ctx.beginPath();
         ctx.arc(rightCentroidCoords.x, rightCentroidCoords.y, 5, 0, 2 * Math.PI);
         ctx.fillStyle = centroidColor
         ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(RIGHT_REST.x, canvasDimensions.y)
+        ctx.lineTo(rightCentroidCoords.x, rightCentroidCoords.y)
+        ctx.lineWidth = 10
+        ctx.strokeStyle = centroidColor
+        ctx.stroke()
     }
 
     function canvasFrame() {
@@ -366,13 +555,13 @@ window.onload = async () => {
         ctx.scale(-1, 1)
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
         const result = handLandmarker.detectForVideo(video, performance.now())
 
         if (result.landmarks && result.landmarks.length == 2){ 
             main(ctx, result)
         }
+        ctx.strokeStyle = "black"
 
         ctx.beginPath();
         ctx.arc(LEFT_REST.x, LEFT_REST.y, REST_BUFFER, 0, 2 * Math.PI);
@@ -383,7 +572,39 @@ window.onload = async () => {
         ctx.lineWidth = 3;
         ctx.stroke();
         ctx.restore()
+        if (isComputerAnimation) {
+            ctx.beginPath();
+            ctx.moveTo(LEFT_REST.x, 0.5 * canvasDimensions.y)
+            ctx.lineTo(LEFT_CPU_ANIMATION.x, LEFT_CPU_ANIMATION.y)
+            ctx.lineWidth = 10
+            ctx.strokeStyle = "black"
+            ctx.stroke()
+            drawFingers(gameState[cpuIndex][1], LEFT_CPU_ANIMATION.x, LEFT_CPU_ANIMATION.y, 100, "black", ctx)
 
+            ctx.beginPath();
+            ctx.moveTo(RIGHT_REST.x, 0.5 * canvasDimensions.y)
+            ctx.lineTo(RIGHT_CPU_ANIMATION.x, RIGHT_CPU_ANIMATION.y)
+            ctx.lineWidth = 10
+            ctx.strokeStyle = "black"
+            ctx.stroke()
+            drawFingers(gameState[cpuIndex][0], RIGHT_CPU_ANIMATION.x, RIGHT_CPU_ANIMATION.y, 100, "black", ctx)
+        } else if (!(isStart && startRound != 2)) {
+            ctx.beginPath();
+            ctx.moveTo(LEFT_REST.x, 0.5 * canvasDimensions.y)
+            ctx.lineTo(LEFT_CPU_REST.x, LEFT_CPU_REST.y)
+            ctx.lineWidth = 10
+            ctx.strokeStyle = "black"
+            ctx.stroke()
+            drawFingers(gameState[cpuIndex][1], LEFT_CPU_REST.x, LEFT_CPU_REST.y, 100, "black", ctx)
+
+            ctx.beginPath();
+            ctx.moveTo(RIGHT_REST.x, 0.5 * canvasDimensions.y)
+            ctx.lineTo(RIGHT_CPU_REST.x, RIGHT_CPU_REST.y)
+            ctx.lineWidth = 10
+            ctx.strokeStyle = "black"
+            ctx.stroke()
+            drawFingers(gameState[cpuIndex][0], RIGHT_CPU_REST.x, RIGHT_CPU_REST.y, 100, "black", ctx)
+        }
         requestAnimationFrame(canvasFrame)
     }
 
@@ -418,7 +639,7 @@ window.onload = async () => {
             .then(result => result.text())
             .then(data => {
                 gTree = JSON.parse(data);
-                const canvasDimensions = scaleCanvas(video.videoWidth, video.videoHeight)
+                canvasDimensions = scaleCanvas(video.videoWidth, video.videoHeight)
                 canvas.width = canvasDimensions.x
                 canvas.height = canvasDimensions.y
                 relativeContainer.style.width = canvasDimensions.x
@@ -430,7 +651,20 @@ window.onload = async () => {
                     x: RIGHT_REST_PERCENT.x * canvasDimensions.x,
                     y: RIGHT_REST_PERCENT.y * canvasDimensions.y
                 }
+                LEFT_CPU_REST = {
+                    x: LEFT_CPU_PERCENT.x * canvasDimensions.x,
+                    y: LEFT_CPU_PERCENT.y * canvasDimensions.y
+                }
+                RIGHT_CPU_REST = {
+                    x: RIGHT_CPU_PERCENT.x * canvasDimensions.x,
+                    y: RIGHT_CPU_PERCENT.y * canvasDimensions.y
+                }
                 REST_BUFFER = canvasDimensions.x / 13
+
+                yChange = Math.abs(RIGHT_CPU_REST.y - RIGHT_REST.y) / ANIMATION_LENGTH
+                xChangeOpp = Math.abs(RIGHT_CPU_REST.x - LEFT_REST.x) / ANIMATION_LENGTH
+                xChangeSplit = (Math.abs(RIGHT_CPU_REST.x - LEFT_CPU_REST.x) / 2) / ANIMATION_LENGTH
+                xChangeSame = Math.abs(RIGHT_CPU_REST.x - RIGHT_REST.x) / ANIMATION_LENGTH
                 setTimeout(() => requestAnimationFrame(canvasFrame), 1000)
             })
             .catch(error => {
