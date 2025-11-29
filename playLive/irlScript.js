@@ -665,6 +665,7 @@ window.onload = async () => {
                 xChangeOpp = Math.abs(RIGHT_CPU_REST.x - LEFT_REST.x) / ANIMATION_LENGTH
                 xChangeSplit = (Math.abs(RIGHT_CPU_REST.x - LEFT_CPU_REST.x) / 2) / ANIMATION_LENGTH
                 xChangeSame = Math.abs(RIGHT_CPU_REST.x - RIGHT_REST.x) / ANIMATION_LENGTH
+                ctx.lineCap = "round"
                 setTimeout(() => requestAnimationFrame(canvasFrame), 1000)
             })
             .catch(error => {
