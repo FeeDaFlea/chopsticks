@@ -402,40 +402,39 @@ window.onload = async () => {
                 "Right"
             )
         
-
-            if (isStart) {
-                if (startRound == 0) {
-                    if (calcDist(leftCentroidCoords, LEFT_REST) < REST_BUFFER && calcDist(rightCentroidCoords, RIGHT_REST) < REST_BUFFER) { //Both are inside
-                        startRound += 1
-                        console.log("START 0")
-                    }
-                } else if (startRound == 1) {
-                    startHist.push(rightFingerCount)
-                    if ((rightFingerCount == 1 || rightFingerCount == 2) && startHist.length >= START_CONFIRM_BUFFER && startHist.slice(-START_CONFIRM_BUFFER).every(elm => elm == rightFingerCount)) {
-                        playerTurn = rightFingerCount
-                        cpuTurn = playerTurn == 1 ? 2 : 1
-                        playerIndex = playerTurn - 1
-                        cpuIndex = cpuTurn - 1
-                        startRound += 1
-                        if (playerTurn == 1) {
-                            isPlayerTurn = true
+            if (rFound && lFound) {
+                if (isStart) {
+                    if (startRound == 0) {
+                        if (calcDist(leftCentroidCoords, LEFT_REST) < REST_BUFFER && calcDist(rightCentroidCoords, RIGHT_REST) < REST_BUFFER) { //Both are inside
+                            startRound += 1
+                            console.log("START 0")
                         }
-                        console.log("START 1")
+                    } else if (startRound == 1) {
+                        startHist.push(rightFingerCount)
+                        if ((rightFingerCount == 1 || rightFingerCount == 2) && startHist.length >= START_CONFIRM_BUFFER && startHist.slice(-START_CONFIRM_BUFFER).every(elm => elm == rightFingerCount)) {
+                            playerTurn = rightFingerCount
+                            cpuTurn = playerTurn == 1 ? 2 : 1
+                            playerIndex = playerTurn - 1
+                            cpuIndex = cpuTurn - 1
+                            startRound += 1
+                            if (playerTurn == 1) {
+                                isPlayerTurn = true
+                            }
+                            console.log("START 1")
+                        }
+                    } else {
+                        if (calcDist(leftCentroidCoords, LEFT_REST) < REST_BUFFER  //Both are inside
+                        && calcDist(rightCentroidCoords, RIGHT_REST) < REST_BUFFER
+                        && leftFingerCount == 1 //Both hands only have one finger
+                        && rightFingerCount == 1) {
+                            isStart = false
+                            updateUI(gameState)
+                            waitTime(1000)
+                            console.log("GO!")
+                        }
                     }
-                } else {
-                    if (calcDist(leftCentroidCoords, LEFT_REST) < REST_BUFFER  //Both are inside
-                    && calcDist(rightCentroidCoords, RIGHT_REST) < REST_BUFFER
-                    && leftFingerCount == 1 //Both hands only have one finger
-                    && rightFingerCount == 1) {
-                        isStart = false
-                        updateUI(gameState)
-                        waitTime(1000)
-                        console.log("GO!")
-                    }
-                }
-            } else if (!isPaused && !isComputerAnimation) {
-                if (isPlayerTurn) {
-                    if (rFound && lFound) {
+                } else if (!isPaused && !isComputerAnimation) {
+                    if (isPlayerTurn) {
                         if (isSplit) {
                             splitHist.push([leftFingerCount, rightFingerCount])
                             let newGameState = [[], []]
@@ -521,47 +520,46 @@ window.onload = async () => {
                                 rightMoveList = []
                             }
                         }
+                    } else { //Computer turn
+                        nextMove = findBestMove(gameState)
+                        animationType = splitOrHit(gameState, nextMove)
+                        isComputerAnimation = true
+                        console.log(animationType)
+                        LEFT_CPU_ANIMATION = {...LEFT_CPU_REST}
+                        RIGHT_CPU_ANIMATION = {...RIGHT_CPU_REST}
                     }
-                } else { //Computer turn
-                    nextMove = findBestMove(gameState)
-                    animationType = splitOrHit(gameState, nextMove)
-                    isComputerAnimation = true
-                    animationToOrFrom = "to"
-                    console.log(animationType)
-                    LEFT_CPU_ANIMATION = {...LEFT_CPU_REST}
-                    RIGHT_CPU_ANIMATION = {...RIGHT_CPU_REST}
                 }
+                let centroidColor = (isStart) ? (
+                                        startRound == 0 ? "black"
+                                        : startRound == 1 ? "yellow"
+                                        : "black" )
+                                    : isSplit ? "purple"
+                                    : isPaused ? "gray"
+                                    : isPlayerTurn ? "blue"
+                                    : "gray"
+
+                ctx.beginPath();
+                ctx.arc(leftCentroidCoords.x, leftCentroidCoords.y, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = centroidColor
+                ctx.fill();
+                ctx.beginPath()
+                ctx.moveTo(LEFT_REST.x, CANVAS_DIMENSIONS.y)
+                ctx.lineTo(leftCentroidCoords.x, leftCentroidCoords.y)
+                ctx.lineWidth = 10
+                ctx.strokeStyle = centroidColor
+                ctx.stroke()
+
+                ctx.beginPath();
+                ctx.arc(rightCentroidCoords.x, rightCentroidCoords.y, 5, 0, 2 * Math.PI);
+                ctx.fillStyle = centroidColor
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(RIGHT_REST.x, CANVAS_DIMENSIONS.y)
+                ctx.lineTo(rightCentroidCoords.x, rightCentroidCoords.y)
+                ctx.lineWidth = 10
+                ctx.strokeStyle = centroidColor
+                ctx.stroke()
             }
-            let centroidColor = (isStart) ? (
-                                    startRound == 0 ? "white"
-                                    : startRound == 1 ? "yellow"
-                                    : "white" )
-                                : isSplit ? "purple"
-                                : isPaused ? "gray"
-                                : isPlayerTurn ? "blue"
-                                : "gray"
-
-            ctx.beginPath();
-            ctx.arc(leftCentroidCoords.x, leftCentroidCoords.y, 5, 0, 2 * Math.PI);
-            ctx.fillStyle = centroidColor
-            ctx.fill();
-            ctx.beginPath()
-            ctx.moveTo(LEFT_REST.x, CANVAS_DIMENSIONS.y)
-            ctx.lineTo(leftCentroidCoords.x, leftCentroidCoords.y)
-            ctx.lineWidth = 10
-            ctx.strokeStyle = centroidColor
-            ctx.stroke()
-
-            ctx.beginPath();
-            ctx.arc(rightCentroidCoords.x, rightCentroidCoords.y, 5, 0, 2 * Math.PI);
-            ctx.fillStyle = centroidColor
-            ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(RIGHT_REST.x, CANVAS_DIMENSIONS.y)
-            ctx.lineTo(rightCentroidCoords.x, rightCentroidCoords.y)
-            ctx.lineWidth = 10
-            ctx.strokeStyle = centroidColor
-            ctx.stroke()
         }
     }
 
