@@ -1,16 +1,18 @@
 import {FilesetResolver, HandLandmarker} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js"
 
-//Declare constands
+//Declare constants
 const TIP_IDS = [4, 8, 12, 16, 20]
 
+//Declare position percents
 const LEFT_REST_PERCENT = {
     x: 0.70,
     y: 0.65
 }
 const RIGHT_REST_PERCENT = {
-    x: 0.30,
-    y: 0.65
+    x: 1 - LEFT_REST_PERCENT.x,
+    y: LEFT_REST_PERCENT.y
 }
+
 const LEFT_CPU_PERCENT = {
     x: 1 - (1 - LEFT_REST_PERCENT.x) / 2,
     y: 1 - LEFT_REST_PERCENT.y
@@ -20,21 +22,12 @@ const RIGHT_CPU_PERCENT = {
     y: 1 - RIGHT_REST_PERCENT.y
 }
 
+//Declare frame buffers for actions
 const HIT_BUFFER = 5
 const SPLIT_BUFFER = 3
 const CONFIRM_BUFFER = 10
 const START_CONFIRM_BUFFER = 30
 const ANIMATION_LENGTH = 20
-
-const NODE_KEY = {
-    gameRound : 0,
-    playerTurn : 1,
-    prevGameState : 2,
-    curGameState : 3,
-    isEnd : 4,
-    isLoop : 5,
-    payoff : 6
-}
 
 //Declare constants that have to be set later
 let LEFT_REST, RIGHT_REST, REST_BUFFER, RIGHT_CPU_REST, LEFT_CPU_REST, RIGHT_CPU_ANIMATION, LEFT_CPU_ANIMATION, CANVAS_DIMENSIONS
@@ -64,12 +57,23 @@ let yChange = 0
 let animationRound = 0
 let startRound = 0
 
-//Declare variables for 
+const NODE_KEY = {
+    gameRound : 0,
+    playerTurn : 1,
+    prevGameState : 2,
+    curGameState : 3,
+    isEnd : 4,
+    isLoop : 5,
+    payoff : 6
+}
+
+//Declare variables for cpu gameplay
 let gTree
 let gameState = [[1, 1], [1, 1]]
 let nextMove = [[], []]
 
 window.onload = async () => {
+    //Declare functions
     function waitTime(time) {
         isPaused = true
         setTimeout(() => isPaused = false, time)
@@ -188,7 +192,7 @@ window.onload = async () => {
         returnState[cpuIndex] = cpuHands
 
         return returnState
-    } //Add one for computer
+    }
 
     function genGameStateCPU(state, move) {
         let playerHands = state[playerIndex]
@@ -218,7 +222,7 @@ window.onload = async () => {
         returnState[cpuIndex] = cpuHands
 
         return returnState
-    } //Add one for computer
+    }
 
     function findBestMove(state) {
         const nextNodes = gTree.filter(node => 
@@ -306,6 +310,7 @@ window.onload = async () => {
             ctx.stroke()
             fingersToDraw -= 1
         }
+
         for (let i = 0; i < fingersToDraw / 2; i ++) {
             let endX = pointX + Math.cos(Math.PI / 2 + runningRad + radPerFinger) * -fingerLength
             let endY = pointY + Math.sin(Math.PI / 2 + runningRad + radPerFinger) * -fingerLength
@@ -662,11 +667,13 @@ window.onload = async () => {
         requestAnimationFrame(canvasFrame)
     }
 
+    //Load model loader
     const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
     );
 
-    const handLandmarker = await HandLandmarker.createFromOptions(vision, { //Load model
+    //Load computer vision movel
+    const handLandmarker = await HandLandmarker.createFromOptions(vision, {
         baseOptions: {
             modelAssetPath: "./hand_landmarker.task"
         },
@@ -674,6 +681,7 @@ window.onload = async () => {
         numHands: 2
     });
 
+    //Get elements in DOM
     const video = document.getElementById("webcam")
     const canvas = document.getElementById("outputCanvas")
     const left = document.getElementById("left")
@@ -683,20 +691,28 @@ window.onload = async () => {
     const cpuRight = document.getElementById("compRight")
     const ctx = canvas.getContext("2d")
 
+    //Open webcam
     const stream = await navigator.mediaDevices.getUserMedia({
         video: true
     })
     video.srcObject = stream
 
-    video.onplaying = () => {
+    video.onplaying = () => { //Wait until after the webcam is accessed
         fetch("./rawGTree.txt")
             .then(result => result.text())
             .then(data => {
+                //Load computer backend
                 gTree = JSON.parse(data);
+
+                //Scale the canvas
                 CANVAS_DIMENSIONS = scaleCanvas(video.videoWidth, video.videoHeight)
                 canvas.width = CANVAS_DIMENSIONS.x
                 canvas.height = CANVAS_DIMENSIONS.y
+
+                //Set container width
                 relativeContainer.style.width = CANVAS_DIMENSIONS.x
+
+                //Set real coords from percents
                 LEFT_REST = {
                     x: LEFT_REST_PERCENT.x * CANVAS_DIMENSIONS.x,
                     y: LEFT_REST_PERCENT.y * CANVAS_DIMENSIONS.y
@@ -713,16 +729,22 @@ window.onload = async () => {
                     x: RIGHT_CPU_PERCENT.x * CANVAS_DIMENSIONS.x,
                     y: RIGHT_CPU_PERCENT.y * CANVAS_DIMENSIONS.y
                 }
+
+                //Scale circle size
                 REST_BUFFER = CANVAS_DIMENSIONS.x / 13
 
+                //Scale animation distances
                 yChange = Math.abs(RIGHT_CPU_REST.y - RIGHT_REST.y) / ANIMATION_LENGTH
                 xChangeOpp = Math.abs(RIGHT_CPU_REST.x - LEFT_REST.x) / ANIMATION_LENGTH
                 xChangeSplit = (Math.abs(RIGHT_CPU_REST.x - LEFT_CPU_REST.x) / 2) / ANIMATION_LENGTH
                 xChangeSame = Math.abs(RIGHT_CPU_REST.x - RIGHT_REST.x) / ANIMATION_LENGTH
+
                 ctx.lineCap = "round"
+
+                //Begin frame loop
                 setTimeout(() => requestAnimationFrame(canvasFrame), 1000)
             })
-            .catch(error => {
+            .catch(error => { //Error handle
                 console.log("Error in parsing text: " + error)
             })
     }
