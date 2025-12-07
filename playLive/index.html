@@ -2,19 +2,23 @@
 <html>
     <head>
         <link rel="stylesheet" href="./irlStyle.css">
+        <style id="dynamyicStyleSheet"></style>
     </head>
     <body>
         <video id="webcam" autoplay playsinline></video>
         <div id="relativeContainer">
             <canvas id="outputCanvas"></canvas>
-            <div id="playerHandsOverlay">
-                <h1 id="left"></h1>
-                <h1 id="right"></h1>
+            <div id="playerHandsOverlay" class="handOverlay overlay">
+                <h1 id="left" class="fingerCount"></h1>
+                <h1 id="right" class="fingerCount"></h1>
             </div>
-            <div id="computerOverlay">
-                <h1 id="compLeft"></h1>
-                <h1 id="compRight"></h1>
+            <div id="computerOverlay" class="handOverlay overlay">
+                <h1 id="compLeft" class="fingerCount"></h1>
+                <h1 id="compRight" class="fingerCount"></h1>
             </div>
+        </div>
+        <div id="textOverlay" class="overlay">
+            <h1 id="announcementBanner"></h1>
         </div>
         <script src="./irlScript.js" type="module"></script>
     </body>
