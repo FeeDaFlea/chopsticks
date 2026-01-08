@@ -349,241 +349,253 @@ window.onload = async () => {
     }
 
     function main(ctx, res) {
-        if (isEnd) {
-            banner.innerHTML = "Game Over!"
-        }
-        else {
-            //Initialize frame specific local
-            let leftCentroidCoords = {x: null, y: null}
-            let rightCentroidCoords = {x: null, y: null}
-            let rFound = false
-            let lFound = false
-            let leftFingerCount = 0
-            let rightFingerCount = 0
+        //Initialize frame specific local
+        let leftCentroidCoords = {x: null, y: null}
+        let rightCentroidCoords = {x: null, y: null}
+        let rFound = false
+        let lFound = false
+        let leftFingerCount = 0
+        let rightFingerCount = 0
 
-            if (isComputerAnimation) {
-                animationRound += 1
-                if (animationType == "split") { //Check
-                    LEFT_CPU_ANIMATION.x -= xChangeSplit
-                    RIGHT_CPU_ANIMATION.x += xChangeSplit
-                } else if (animationType == "RL") {
-                    LEFT_CPU_ANIMATION.x -= xChangeOpp
-                    LEFT_CPU_ANIMATION.y += yChange
-                } else if (animationType == "LR") {
-                    RIGHT_CPU_ANIMATION.x += xChangeOpp
-                    RIGHT_CPU_ANIMATION.y += yChange
-                } else if (animationType == "LL") {
-                    RIGHT_CPU_ANIMATION.x += xChangeSame
-                    RIGHT_CPU_ANIMATION.y += yChange
+        if (isComputerAnimation) {
+            animationRound += 1
+            if (animationType == "split") { //Check
+                LEFT_CPU_ANIMATION.x -= xChangeSplit
+                RIGHT_CPU_ANIMATION.x += xChangeSplit
+            } else if (animationType == "RL") {
+                LEFT_CPU_ANIMATION.x -= xChangeOpp
+                LEFT_CPU_ANIMATION.y += yChange
+            } else if (animationType == "LR") {
+                RIGHT_CPU_ANIMATION.x += xChangeOpp
+                RIGHT_CPU_ANIMATION.y += yChange
+            } else if (animationType == "LL") {
+                RIGHT_CPU_ANIMATION.x += xChangeSame
+                RIGHT_CPU_ANIMATION.y += yChange
+            } else {
+                LEFT_CPU_ANIMATION.x -= xChangeSame
+                LEFT_CPU_ANIMATION.y += yChange
+            }
+            if (animationRound >= ANIMATION_LENGTH) {
+                isComputerAnimation = false
+                isPlayerTurn = true
+                animationRound = 0
+                gameState = nextMove
+                if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
+                updateUI(gameState)
+                waitTime(1000)
+            }
+        } 
+
+        if (res.landmarks && res.landmarks.length >= 2) {
+            for (let i = 0; i < 2; i++){
+                let hand = res.landmarks[i]
+                let palm = [hand[0], hand[1], hand[5], hand[9], hand[13], hand[17]]
+                let [centroidX, centroidY] = palm.reduce((p, c) => [p[0] + c.x, p[1] + c.y], [0, 0]).map(elm => elm / palm.length)
+
+                if (res.handednesses[i][0].categoryName == "Left") {
+                    leftCentroidCoords.x = centroidX * canvas.width
+                    leftCentroidCoords.y = centroidY * canvas.height
+                    lFound = true
                 } else {
-                    LEFT_CPU_ANIMATION.x -= xChangeSame
-                    LEFT_CPU_ANIMATION.y += yChange
+                    rightCentroidCoords.x = centroidX * canvas.width
+                    rightCentroidCoords.y = centroidY * canvas.height
+                    rFound = true
                 }
-                if (animationRound >= ANIMATION_LENGTH) {
-                    isComputerAnimation = false
-                    isPlayerTurn = true
-                    animationRound = 0
-                    gameState = nextMove
-                    if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
-                    updateUI(gameState)
-                    waitTime(1000)
-                }
-            } 
+            }
 
-            if (res.landmarks && res.landmarks.length >= 2) {
-                for (let i = 0; i < 2; i++){
-                    let hand = res.landmarks[i]
-                    let palm = [hand[0], hand[1], hand[5], hand[9], hand[13], hand[17]]
-                    let [centroidX, centroidY] = palm.reduce((p, c) => [p[0] + c.x, p[1] + c.y], [0, 0]).map(elm => elm / palm.length)
+        
+            leftFingerCount = countFingers(
+                res.handednesses[0][0].categoryName == "Left" ? res.landmarks[0] : res.landmarks[1], 
+                "Left"
+            )
 
-                    if (res.handednesses[i][0].categoryName == "Left") {
-                        leftCentroidCoords.x = centroidX * canvas.width
-                        leftCentroidCoords.y = centroidY * canvas.height
-                        lFound = true
-                    } else {
-                        rightCentroidCoords.x = centroidX * canvas.width
-                        rightCentroidCoords.y = centroidY * canvas.height
-                        rFound = true
-                    }
-                }
-
+            rightFingerCount = countFingers(
+                res.handednesses[0][0].categoryName == "Right" ? res.landmarks[0] : res.landmarks[1], 
+                "Right"
+            )
             
-                leftFingerCount = countFingers(
-                    res.handednesses[0][0].categoryName == "Left" ? res.landmarks[0] : res.landmarks[1], 
-                    "Left"
-                )
-
-                rightFingerCount = countFingers(
-                    res.handednesses[0][0].categoryName == "Right" ? res.landmarks[0] : res.landmarks[1], 
-                    "Right"
-                )
-            
-                if (rFound && lFound) {
-                    if (isStart) {
-                        if (startRound == 0) {
-                            if (calcDist(leftCentroidCoords, LEFT_REST) < REST_BUFFER && calcDist(rightCentroidCoords, RIGHT_REST) < REST_BUFFER) { //Both are inside
-                                startRound += 1
+            if (rFound && lFound && !isEnd) {
+                if (isStart) {
+                    if (startRound == 0) {
+                        if (calcDist(leftCentroidCoords, LEFT_REST) < REST_BUFFER && calcDist(rightCentroidCoords, RIGHT_REST) < REST_BUFFER) { //Both are inside
+                            startRound += 1
+                        }
+                    } else if (startRound == 1) {
+                        startHist.push(rightFingerCount)
+                        banner.innerHTML = "Pick first or second on your right hand: " + rightFingerCount.toString()
+                        if ((rightFingerCount == 1 || rightFingerCount == 2) && startHist.length >= START_CONFIRM_BUFFER && startHist.slice(-START_CONFIRM_BUFFER).every(elm => elm == rightFingerCount)) {
+                            playerTurn = rightFingerCount
+                            cpuTurn = playerTurn == 1 ? 2 : 1
+                            playerIndex = playerTurn - 1
+                            cpuIndex = cpuTurn - 1
+                            startRound += 1
+                            if (playerTurn == 1) {
+                                isPlayerTurn = true
                             }
-                        } else if (startRound == 1) {
-                            startHist.push(rightFingerCount)
-                            banner.innerHTML = "Pick first or second on your right hand: " + rightFingerCount.toString()
-                            if ((rightFingerCount == 1 || rightFingerCount == 2) && startHist.length >= START_CONFIRM_BUFFER && startHist.slice(-START_CONFIRM_BUFFER).every(elm => elm == rightFingerCount)) {
-                                playerTurn = rightFingerCount
-                                cpuTurn = playerTurn == 1 ? 2 : 1
-                                playerIndex = playerTurn - 1
-                                cpuIndex = cpuTurn - 1
-                                startRound += 1
-                                if (playerTurn == 1) {
-                                    isPlayerTurn = true
+                        }
+                    } else {
+                        banner.innerHTML = "Get Ready!"
+                        if (calcDist(leftCentroidCoords, LEFT_REST) < REST_BUFFER  //Both are inside
+                        && calcDist(rightCentroidCoords, RIGHT_REST) < REST_BUFFER
+                        && leftFingerCount == 1 //Both hands only have one finger
+                        && rightFingerCount == 1) {
+                            isStart = false
+                            updateUI(gameState)
+                            waitTime(1000)
+                        }
+                    }
+                } else if (!isPaused && !isComputerAnimation) {
+                    if (isPlayerTurn) {
+                        if (isSplit) {
+                            splitHist.push([leftFingerCount, rightFingerCount])
+                            let newGameState = [[], []]
+                            newGameState[cpuIndex] = gameState[cpuIndex]
+                            newGameState[playerIndex] = [leftFingerCount, rightFingerCount]
+                            updateUI(newGameState)
+                            if (splitHist.length >= CONFIRM_BUFFER && 
+                                splitHist.slice(-CONFIRM_BUFFER).every(elm => JSON.stringify(elm) == JSON.stringify([leftFingerCount, rightFingerCount]))) {
+                                splitHist = []
+                                if (valMove(gameState, newGameState)) {
+                                    gameState[playerIndex] = [leftFingerCount, rightFingerCount]
+                                    isSplit = false
+                                    isPlayerTurn = false
+                                    waitTime(1000)
                                 }
                             }
                         } else {
-                            banner.innerHTML = "Get Ready!"
-                            if (calcDist(leftCentroidCoords, LEFT_REST) < REST_BUFFER  //Both are inside
-                            && calcDist(rightCentroidCoords, RIGHT_REST) < REST_BUFFER
-                            && leftFingerCount == 1 //Both hands only have one finger
-                            && rightFingerCount == 1) {
-                                isStart = false
-                                updateUI(gameState)
-                                waitTime(1000)
+                            banner.innerHTML = "Your Turn"
+                            if (calcDist(leftCentroidCoords, LEFT_REST) > REST_BUFFER) { //Left is outside circle
+                                if (leftCentroidCoords.x > LEFT_REST.x - REST_BUFFER) { //Hand is to the right or staight up
+                                    leftMoveList.push("LL")
+                                    if (checkSplit()) {
+                                        banner.innerHTML = `Split! (Sum ${gameState[playerIndex][0] + gameState[playerIndex][1]})`
+                                        isSplit = true
+                                    } else if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LL")) {
+                                        const newGameState = genGameStatePlayer(structuredClone(gameState), "LL")
+                                        if (valMove(gameState, newGameState)) {
+                                            gameState = newGameState
+                                            if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
+                                            updateUI(gameState)
+                                            leftMoveList = []
+                                            isPlayerTurn = false
+                                            waitTime(1000)
+                                        }
+                                    }
+                                } else { //Hand is to the left
+                                    leftMoveList.push("LR")
+                                    if (checkSplit()) {
+                                        banner.innerHTML = `Split! (Sum ${gameState[playerIndex][0] + gameState[playerIndex][1]})`
+                                        isSplit = true
+                                    } else if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LR")) {
+                                        const newGameState = genGameStatePlayer(structuredClone(gameState), "LR")
+                                        if (valMove(gameState, newGameState)) {
+                                            gameState = newGameState
+                                            if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
+                                            updateUI(gameState)
+                                            leftMoveList = []
+                                            isPlayerTurn = false
+                                            waitTime(1000)
+                                        }
+                                    }
+                                }
+                            } else { //Left is inside circle
+                                leftMoveList = []
+                            }
+                            
+                            if (calcDist(rightCentroidCoords, RIGHT_REST) > REST_BUFFER) { //Right is outside
+                                if (rightCentroidCoords.x < RIGHT_REST.x + REST_BUFFER) { //Hand is to the right or straight up
+                                    rightMoveList.push("RR")
+                                    if (checkSplit()) {
+                                        banner.innerHTML = `Split! (Sum ${gameState[playerIndex][0] + gameState[playerIndex][1]})`
+                                        isSplit = true
+                                    } else if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RR")) {
+                                        const newGameState = genGameStatePlayer(structuredClone(gameState), "RR")
+                                        if (valMove(gameState, newGameState)) {
+                                            gameState = newGameState
+                                            if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
+                                            updateUI(gameState)
+                                            rightMoveList = []
+                                            isPlayerTurn = false
+                                            waitTime(1000)
+                                        }
+                                    }
+                                } else { //Hand is to the left
+                                    rightMoveList.push("RL")
+                                    if (checkSplit()) {
+                                        banner.innerHTML = `Split! (Sum ${gameState[playerIndex][0] + gameState[playerIndex][1]})`
+                                        isSplit = true
+                                    } else if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RL")) {
+                                        const newGameState = genGameStatePlayer(structuredClone(gameState), "RL")
+                                        if (valMove(gameState, newGameState)) {
+                                            gameState = newGameState
+                                            if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
+                                            updateUI(gameState)
+                                            rightMoveList = []
+                                            isPlayerTurn = false
+                                            waitTime(1000)
+                                        }
+                                    }
+                                }
+                            } else { //Right is inside circle
+                                rightMoveList = []
                             }
                         }
-                    } else if (!isPaused && !isComputerAnimation) {
-                        if (isPlayerTurn) {
-                            if (isSplit) {
-                                splitHist.push([leftFingerCount, rightFingerCount])
-                                let newGameState = [[], []]
-                                newGameState[cpuIndex] = gameState[cpuIndex]
-                                newGameState[playerIndex] = [leftFingerCount, rightFingerCount]
-                                updateUI(newGameState)
-                                if (splitHist.length >= CONFIRM_BUFFER && 
-                                    splitHist.slice(-CONFIRM_BUFFER).every(elm => JSON.stringify(elm) == JSON.stringify([leftFingerCount, rightFingerCount]))) {
-                                    splitHist = []
-                                    if (valMove(gameState, newGameState)) {
-                                        gameState[playerIndex] = [leftFingerCount, rightFingerCount]
-                                        isSplit = false
-                                        isPlayerTurn = false
-                                        waitTime(1000)
-                                    }
-                                }
-                            } else {
-                                banner.innerHTML = "Your Turn"
-                                if (calcDist(leftCentroidCoords, LEFT_REST) > REST_BUFFER) { //Left is outside circle
-                                    if (leftCentroidCoords.x > LEFT_REST.x - REST_BUFFER) { //Hand is to the right or staight up
-                                        leftMoveList.push("LL")
-                                        if (checkSplit()) {
-                                            banner.innerHTML = `Split! (Sum ${leftFingerCount + rightFingerCount})`
-                                            isSplit = true
-                                        } else if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LL")) {
-                                            const newGameState = genGameStatePlayer(structuredClone(gameState), "LL")
-                                            if (valMove(gameState, newGameState)) {
-                                                gameState = newGameState
-                                                if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
-                                                updateUI(gameState)
-                                                leftMoveList = []
-                                                isPlayerTurn = false
-                                                waitTime(1000)
-                                            }
-                                        }
-                                    } else { //Hand is to the left
-                                        leftMoveList.push("LR")
-                                        if (checkSplit()) {
-                                            banner.innerHTML = `Split! (Sum ${leftFingerCount + rightFingerCount})`
-                                            isSplit = true
-                                        } else if (leftMoveList.length >= HIT_BUFFER && leftMoveList.slice(-HIT_BUFFER).every(elm => elm == "LR")) {
-                                            const newGameState = genGameStatePlayer(structuredClone(gameState), "LR")
-                                            if (valMove(gameState, newGameState)) {
-                                                gameState = newGameState
-                                                if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
-                                                updateUI(gameState)
-                                                leftMoveList = []
-                                                isPlayerTurn = false
-                                                waitTime(1000)
-                                            }
-                                        }
-                                    }
-                                } else { //Left is inside circle
-                                    leftMoveList = []
-                                }
-                                
-                                if (calcDist(rightCentroidCoords, RIGHT_REST) > REST_BUFFER) { //Right is outside
-                                    if (rightCentroidCoords.x < RIGHT_REST.x + REST_BUFFER) { //Hand is to the right or straight up
-                                        rightMoveList.push("RR")
-                                        if (checkSplit()) {
-                                            banner.innerHTML = `Split! (Sum ${leftFingerCount + rightFingerCount})`
-                                            isSplit = true
-                                        } else if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RR")) {
-                                            const newGameState = genGameStatePlayer(structuredClone(gameState), "RR")
-                                            if (valMove(gameState, newGameState)) {
-                                                gameState = newGameState
-                                                if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
-                                                updateUI(gameState)
-                                                rightMoveList = []
-                                                isPlayerTurn = false
-                                                waitTime(1000)
-                                            }
-                                        }
-                                    } else { //Hand is to the left
-                                        rightMoveList.push("RL")
-                                        if (checkSplit()) {
-                                            banner.innerHTML = `Split! (Sum ${leftFingerCount + rightFingerCount})`
-                                            isSplit = true
-                                        } else if (rightMoveList.length >= HIT_BUFFER && rightMoveList.slice(-HIT_BUFFER).every(elm => elm == "RL")) {
-                                            const newGameState = genGameStatePlayer(structuredClone(gameState), "RL")
-                                            if (valMove(gameState, newGameState)) {
-                                                gameState = newGameState
-                                                if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
-                                                updateUI(gameState)
-                                                rightMoveList = []
-                                                isPlayerTurn = false
-                                                waitTime(1000)
-                                            }
-                                        }
-                                    }
-                                } else { //Right is inside circle
-                                    rightMoveList = []
-                                }
-                            }
-                        } else { //Computer Turn
-                            banner.innerHTML = "CPU Turn"
-                            nextMove = findBestMove(gameState)
-                            animationType = splitOrHit(gameState, nextMove)
-                            isComputerAnimation = true
-                            LEFT_CPU_ANIMATION = {...LEFT_CPU_REST}
-                            RIGHT_CPU_ANIMATION = {...RIGHT_CPU_REST}
-                        }
+                    } else { //Computer Turn
+                        banner.innerHTML = "CPU Turn"
+                        nextMove = findBestMove(gameState)
+                        animationType = splitOrHit(gameState, nextMove)
+                        isComputerAnimation = true
+                        LEFT_CPU_ANIMATION = {...LEFT_CPU_REST}
+                        RIGHT_CPU_ANIMATION = {...RIGHT_CPU_REST}
                     }
-                    let armColor = (isStart) ? (
-                                            startRound == 0 ? "black"
-                                            : startRound == 1 ? "yellow"
-                                            : "black" )
-                                        : isSplit ? "purple"
-                                        : isPaused ? "gray"
-                                        : isPlayerTurn ? "blue"
-                                        : "gray"
-
-                    ctx.beginPath();
-                    ctx.arc(leftCentroidCoords.x, leftCentroidCoords.y, 5, 0, 2 * Math.PI);
-                    ctx.fillStyle = armColor
-                    ctx.fill();
-                    ctx.beginPath()
-                    ctx.moveTo(LEFT_REST.x, CANVAS_DIMENSIONS.y)
-                    ctx.lineTo(leftCentroidCoords.x, leftCentroidCoords.y)
-                    ctx.lineWidth = 10
-                    ctx.strokeStyle = armColor
-                    ctx.stroke()
-
-                    ctx.beginPath();
-                    ctx.arc(rightCentroidCoords.x, rightCentroidCoords.y, 5, 0, 2 * Math.PI);
-                    ctx.fillStyle = armColor
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.moveTo(RIGHT_REST.x, CANVAS_DIMENSIONS.y)
-                    ctx.lineTo(rightCentroidCoords.x, rightCentroidCoords.y)
-                    ctx.lineWidth = 10
-                    ctx.strokeStyle = armColor
-                    ctx.stroke()
                 }
+
+                let armColor = (isStart) ? (
+                                        startRound == 0 ? "black"
+                                        : startRound == 1 ? "yellow"
+                                        : "black" 
+                                ) : isSplit ? "purple"
+                                : isPaused ? "gray"
+                                : isPlayerTurn ? "blue"
+                                : "gray"
+
+                ctx.beginPath();
+                ctx.arc(leftCentroidCoords.x, leftCentroidCoords.y, 5, 0, 2 * Math.PI);
+                if ((!isStart && leftFingerCount == gameState[playerIndex][0]) || isStart || isSplit) {
+                    ctx.fillStyle = armColor
+                } else {
+                    ctx.fillStyle = "red"
+                }
+                ctx.fill();
+                ctx.beginPath()
+                ctx.moveTo(LEFT_REST.x, CANVAS_DIMENSIONS.y)
+                ctx.lineTo(leftCentroidCoords.x, leftCentroidCoords.y)
+                ctx.lineWidth = 10
+                if ((!isStart && leftFingerCount == gameState[playerIndex][0]) || isStart || isSplit) {
+                    ctx.strokeStyle = armColor
+                } else {
+                    ctx.strokeStyle = "red"
+                }                    
+                ctx.stroke()
+
+                ctx.beginPath();
+                ctx.arc(rightCentroidCoords.x, rightCentroidCoords.y, 5, 0, 2 * Math.PI);
+                if ((!isStart && rightFingerCount == gameState[playerIndex][1]) || isStart || isSplit) {
+                    ctx.fillStyle = armColor
+                } else {
+                    ctx.fillStyle = "red"
+                }                    
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(RIGHT_REST.x, CANVAS_DIMENSIONS.y)
+                ctx.lineTo(rightCentroidCoords.x, rightCentroidCoords.y)
+                ctx.lineWidth = 10
+                if ((!isStart && rightFingerCount == gameState[playerIndex][1]) || isStart || isSplit) {
+                    ctx.strokeStyle = armColor
+                } else {
+                    ctx.strokeStyle = "red"
+                }      
+                ctx.stroke()
             }
         }
     }
@@ -626,8 +638,10 @@ window.onload = async () => {
                 ctx.stroke()
                 drawFingers(gameState[cpuIndex][1], LEFT_CPU_ANIMATION.x, LEFT_CPU_ANIMATION.y, FINGER_LENGTH, "black", ctx)
 
-                // ctx.beginPath();
-                // ctx.arc(LEFT_CPU_ANIMATION.x, LEFT_CPU_ANIMATION.y, 10, 0, 2 * Math.PI / 180)
+                ctx.beginPath();
+                ctx.arc(LEFT_CPU_ANIMATION.x, LEFT_CPU_ANIMATION.y, 10, 0, 2 * Math.PI)
+                ctx.fillStyle = "black"
+                ctx.fill()
 
                 //Draw computer right hand at animation coords
                 ctx.beginPath();
@@ -636,6 +650,11 @@ window.onload = async () => {
                 ctx.lineWidth = 10
                 ctx.stroke()
                 drawFingers(gameState[cpuIndex][0], RIGHT_CPU_ANIMATION.x, RIGHT_CPU_ANIMATION.y, FINGER_LENGTH, "black", ctx)
+                
+                ctx.beginPath();
+                ctx.arc(RIGHT_CPU_ANIMATION.x, RIGHT_CPU_ANIMATION.y, 10, 0, 2 * Math.PI)
+                ctx.fillStyle = "black"
+                ctx.fill()
 
             } else {
                 //Draw computer left arm
@@ -648,6 +667,11 @@ window.onload = async () => {
                 //Draw computer left hand at rest coords                
                 drawFingers(gameState[cpuIndex][1], LEFT_CPU_REST.x, LEFT_CPU_REST.y, FINGER_LENGTH, "black", ctx)
 
+                ctx.beginPath();
+                ctx.arc(LEFT_CPU_REST.x, LEFT_CPU_REST.y, 10, 0, 2 * Math.PI)
+                ctx.fillStyle = "black"
+                ctx.fill()
+
                 //Draw computer right arm
                 ctx.beginPath();
                 ctx.moveTo(RIGHT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
@@ -657,6 +681,11 @@ window.onload = async () => {
 
                 //Draw computer right hand at rest coords
                 drawFingers(gameState[cpuIndex][0], RIGHT_CPU_REST.x, RIGHT_CPU_REST.y, FINGER_LENGTH, "black", ctx)
+
+                ctx.beginPath();
+                ctx.arc(RIGHT_CPU_REST.x, RIGHT_CPU_REST.y, 10, 0, 2 * Math.PI)
+                ctx.fillStyle = "black"
+                ctx.fill()
             }
 
             //Draw line connecting arms
@@ -715,6 +744,7 @@ window.onload = async () => {
     const ctx = canvas.getContext("2d")
     const sheet = document.getElementById("dynamyicStyleSheet").sheet
     const banner = document.getElementById("announcementBanner")
+    const loseScreen = document.getElementById("loseScreen")
 
     //Open webcam
     const stream = await navigator.mediaDevices.getUserMedia({

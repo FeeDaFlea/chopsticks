@@ -52,3 +52,29 @@ body {
     display:flex;
     justify-content:center;
 }
+
+#playAgain {
+    border-radius: 3px;
+    background-color: blue;
+    border:0px;
+    color: white;
+    width: 25%;
+    height: 15%;
+}
+
+#loseScreen {
+    border-radius: 15px;
+    background-color:#F9F5EC; 
+    position:absolute;
+    flex-direction:column;
+    top: 50%;
+    left: 50%;
+    height:25%;
+    width:40%;
+    border: 1px solid black;
+    transform: translate(-50%, -50%);
+    display:none;
+    justify-content:center;
+    align-items:center; 
+    box-shadow: 10px 10px 5px gray;
+}
