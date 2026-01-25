@@ -23,14 +23,15 @@ const RIGHT_CPU_PERCENT = {
 }
 
 //Declare frame buffers for actions
-const HIT_BUFFER = 5
-const SPLIT_BUFFER = 3
-const CONFIRM_BUFFER = 10
-const START_CONFIRM_BUFFER = 30
-const ANIMATION_LENGTH = 20
+//8.8 devFrames per 1 second
+const HIT_BUFFER_SECONDS = 0.6 //0.6 seconds 5 devFrames
+const SPLIT_BUFFER_SECONDS = 0.4 //0.4 seconds 3 devFrames
+const CONFIRM_BUFFER_SECONDS = 1.2 // 1.2 seconds 10 devFrames
+const START_CONFIRM_BUFFER_SECONDS = 3.4 //3.4 seconds 30 devFrames
+const ANIMATION_LENGTH_SECONDS = 2.3 //2.3 seconds 20 devFrames
 
 //Declare constants that have to be set later
-let LEFT_REST, RIGHT_REST, REST_BUFFER, RIGHT_CPU_REST, LEFT_CPU_REST, RIGHT_CPU_ANIMATION, LEFT_CPU_ANIMATION, CANVAS_DIMENSIONS, FINGER_LENGTH
+let LEFT_REST, RIGHT_REST, REST_BUFFER, RIGHT_CPU_REST, LEFT_CPU_REST, RIGHT_CPU_ANIMATION, LEFT_CPU_ANIMATION, CANVAS_DIMENSIONS, FINGER_LENGTH, HIT_BUFFER, SPLIT_BUFFER, CONFIRM_BUFFER, START_CONFIRM_BUFFER, ANIMATION_LENGTH
 
 //Declare tracking across frames
 let leftMoveList = []
@@ -72,6 +73,8 @@ const NODE_KEY = {
 let gTree
 let gameState = [[1, 1], [1, 1]]
 let nextMove = [[], []]
+
+let startTime, endTime, numFrames = 0, firstFrameTime, secondFrameTime
 
 window.onload = async () => {
     //Declare functions
@@ -380,7 +383,12 @@ window.onload = async () => {
                 isPlayerTurn = true
                 animationRound = 0
                 gameState = nextMove
-                if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
+                if (JSON.stringify(gameState).includes("[0,0]")) {
+                    isEnd = true; 
+                    endTime = Math.floor(Date.now() / 1000)
+                    let elapsedTime = endTime - startTime
+                    console.log("Frame Rate:" + numFrames / elapsedTime)
+                }
                 updateUI(gameState)
                 waitTime(1000)
             }
@@ -474,7 +482,12 @@ window.onload = async () => {
                                         const newGameState = genGameStatePlayer(structuredClone(gameState), "LL")
                                         if (valMove(gameState, newGameState)) {
                                             gameState = newGameState
-                                            if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
+                                            if (JSON.stringify(gameState).includes("[0,0]")) {
+                                                isEnd = true; 
+                                                endTime = Math.floor(Date.now() / 1000)
+                                                let elapsedTime = endTime - startTime
+                                                console.log(elapsedTime / numFrames)
+                                                }
                                             updateUI(gameState)
                                             leftMoveList = []
                                             isPlayerTurn = false
@@ -490,7 +503,12 @@ window.onload = async () => {
                                         const newGameState = genGameStatePlayer(structuredClone(gameState), "LR")
                                         if (valMove(gameState, newGameState)) {
                                             gameState = newGameState
-                                            if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
+                                            if (JSON.stringify(gameState).includes("[0,0]")) {
+                                                isEnd = true; 
+                                                endTime = Math.floor(Date.now() / 1000)
+                                                let elapsedTime = endTime - startTime
+                                                console.log(elapsedTime / numFrames)
+                                                }
                                             updateUI(gameState)
                                             leftMoveList = []
                                             isPlayerTurn = false
@@ -512,7 +530,12 @@ window.onload = async () => {
                                         const newGameState = genGameStatePlayer(structuredClone(gameState), "RR")
                                         if (valMove(gameState, newGameState)) {
                                             gameState = newGameState
-                                            if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
+                                            if (JSON.stringify(gameState).includes("[0,0]")) {
+                                                isEnd = true; 
+                                                endTime = Math.floor(Date.now() / 1000)
+                                                let elapsedTime = endTime - startTime
+                                                console.log(elapsedTime / numFrames)
+                                                }
                                             updateUI(gameState)
                                             rightMoveList = []
                                             isPlayerTurn = false
@@ -528,7 +551,12 @@ window.onload = async () => {
                                         const newGameState = genGameStatePlayer(structuredClone(gameState), "RL")
                                         if (valMove(gameState, newGameState)) {
                                             gameState = newGameState
-                                            if (JSON.stringify(gameState).includes("[0,0]")) isEnd = true
+                                            if (JSON.stringify(gameState).includes("[0,0]")) {
+                                                isEnd = true; 
+                                                endTime = Math.floor(Date.now() / 1000)
+                                                let elapsedTime = endTime - startTime
+                                                console.log(elapsedTime / numFrames)
+                                                }
                                             updateUI(gameState)
                                             rightMoveList = []
                                             isPlayerTurn = false
@@ -601,6 +629,7 @@ window.onload = async () => {
     }
 
     function canvasFrame() {
+        numFrames += 1
         //Setup canvas
         ctx.save()
         ctx.translate(canvas.width, 0);
@@ -611,108 +640,137 @@ window.onload = async () => {
         //Process frame with mediapipe
         const result = handLandmarker.detectForVideo(video, performance.now())
 
-        main(ctx, result)
+        if (numFrames == 1) {
+            firstFrameTime = Date.now() / 1000;
+        } else if (numFrames == 2) {
+            secondFrameTime = Date.now() / 1000;
+            let sampleTimeElapsed = secondFrameTime - firstFrameTime
 
-        //Draw left and right rest circles
-        ctx.strokeStyle = "black"
-        ctx.beginPath();
-        ctx.arc(LEFT_REST.x, LEFT_REST.y, REST_BUFFER, 0, 2 * Math.PI);
-        ctx.lineWidth = 3;
-        ctx.stroke();
+            console.log(1/sampleTimeElapsed)
 
-        ctx.beginPath();
-        ctx.arc(RIGHT_REST.x, RIGHT_REST.y, REST_BUFFER, 0, 2 * Math.PI);
-        ctx.lineWidth = 3;
-        ctx.stroke();
-        ctx.restore();
+            //Scale times
+            HIT_BUFFER = Math.ceil(HIT_BUFFER_SECONDS / sampleTimeElapsed)
+            SPLIT_BUFFER = Math.ceil(SPLIT_BUFFER_SECONDS / sampleTimeElapsed)
+            CONFIRM_BUFFER = Math.ceil(CONFIRM_BUFFER_SECONDS / sampleTimeElapsed)
+            START_CONFIRM_BUFFER = Math.ceil(START_CONFIRM_BUFFER_SECONDS / sampleTimeElapsed)
+            ANIMATION_LENGTH = Math.ceil(ANIMATION_LENGTH_SECONDS / sampleTimeElapsed)
 
-        //Draw robot
-        if (!(isStart && startRound != 2)) {
-            //Draw moving parts (arm, hand)
-            if (isComputerAnimation) {
-                //Draw computer left hand at animation coords
-                ctx.beginPath();
-                ctx.moveTo(LEFT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
-                ctx.lineTo(LEFT_CPU_ANIMATION.x, LEFT_CPU_ANIMATION.y)
-                ctx.lineWidth = 10
-                ctx.stroke()
-                drawFingers(gameState[cpuIndex][1], LEFT_CPU_ANIMATION.x, LEFT_CPU_ANIMATION.y, FINGER_LENGTH, "black", ctx)
+            //Scale animation
+            yChange = Math.abs(RIGHT_CPU_REST.y - RIGHT_REST.y) / ANIMATION_LENGTH
+            xChangeOpp = Math.abs(RIGHT_CPU_REST.x - LEFT_REST.x) / ANIMATION_LENGTH
+            xChangeSplit = (Math.abs(RIGHT_CPU_REST.x - LEFT_CPU_REST.x) / 2) / ANIMATION_LENGTH
+            xChangeSame = Math.abs(RIGHT_CPU_REST.x - RIGHT_REST.x) / ANIMATION_LENGTH
 
-                ctx.beginPath();
-                ctx.arc(LEFT_CPU_ANIMATION.x, LEFT_CPU_ANIMATION.y, 10, 0, 2 * Math.PI)
-                ctx.fillStyle = "black"
-                ctx.fill()
+            console.log(HIT_BUFFER)
+            console.log(SPLIT_BUFFER)
+            console.log(CONFIRM_BUFFER)
+            console.log(START_CONFIRM_BUFFER)
+            console.log(ANIMATION_LENGTH)
+            
+        } else {
+            main(ctx, result)
 
-                //Draw computer right hand at animation coords
-                ctx.beginPath();
+            //Draw left and right rest circles
+            ctx.strokeStyle = "black"
+            ctx.beginPath();
+            ctx.arc(LEFT_REST.x, LEFT_REST.y, REST_BUFFER, 0, 2 * Math.PI);
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(RIGHT_REST.x, RIGHT_REST.y, REST_BUFFER, 0, 2 * Math.PI);
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.restore();
+
+            //Draw robot
+            if (!(isStart && startRound != 2)) {
+                //Draw moving parts (arm, hand)
+                if (isComputerAnimation) {
+                    //Draw computer left hand at animation coords
+                    ctx.beginPath();
+                    ctx.moveTo(LEFT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
+                    ctx.lineTo(LEFT_CPU_ANIMATION.x, LEFT_CPU_ANIMATION.y)
+                    ctx.lineWidth = 10
+                    ctx.stroke()
+                    drawFingers(gameState[cpuIndex][1], LEFT_CPU_ANIMATION.x, LEFT_CPU_ANIMATION.y, FINGER_LENGTH, "black", ctx)
+
+                    ctx.beginPath();
+                    ctx.arc(LEFT_CPU_ANIMATION.x, LEFT_CPU_ANIMATION.y, 10, 0, 2 * Math.PI)
+                    ctx.fillStyle = "black"
+                    ctx.fill()
+
+                    //Draw computer right hand at animation coords
+                    ctx.beginPath();
+                    ctx.moveTo(RIGHT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
+                    ctx.lineTo(RIGHT_CPU_ANIMATION.x, RIGHT_CPU_ANIMATION.y)
+                    ctx.lineWidth = 10
+                    ctx.stroke()
+                    drawFingers(gameState[cpuIndex][0], RIGHT_CPU_ANIMATION.x, RIGHT_CPU_ANIMATION.y, FINGER_LENGTH, "black", ctx)
+                    
+                    ctx.beginPath();
+                    ctx.arc(RIGHT_CPU_ANIMATION.x, RIGHT_CPU_ANIMATION.y, 10, 0, 2 * Math.PI)
+                    ctx.fillStyle = "black"
+                    ctx.fill()
+
+                } else {
+                    //Draw computer left arm
+                    ctx.beginPath();
+                    ctx.moveTo(LEFT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
+                    ctx.lineTo(LEFT_CPU_REST.x, LEFT_CPU_REST.y)
+                    ctx.lineWidth = 10
+                    ctx.stroke()
+
+                    //Draw computer left hand at rest coords                
+                    drawFingers(gameState[cpuIndex][1], LEFT_CPU_REST.x, LEFT_CPU_REST.y, FINGER_LENGTH, "black", ctx)
+
+                    ctx.beginPath();
+                    ctx.arc(LEFT_CPU_REST.x, LEFT_CPU_REST.y, 10, 0, 2 * Math.PI)
+                    ctx.fillStyle = "black"
+                    ctx.fill()
+
+                    //Draw computer right arm
+                    ctx.beginPath();
+                    ctx.moveTo(RIGHT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
+                    ctx.lineTo(RIGHT_CPU_REST.x, RIGHT_CPU_REST.y)
+                    ctx.lineWidth = 10
+                    ctx.stroke()
+
+                    //Draw computer right hand at rest coords
+                    drawFingers(gameState[cpuIndex][0], RIGHT_CPU_REST.x, RIGHT_CPU_REST.y, FINGER_LENGTH, "black", ctx)
+
+                    ctx.beginPath();
+                    ctx.arc(RIGHT_CPU_REST.x, RIGHT_CPU_REST.y, 10, 0, 2 * Math.PI)
+                    ctx.fillStyle = "black"
+                    ctx.fill()
+                }
+
+                //Draw line connecting arms
+                ctx.beginPath()
                 ctx.moveTo(RIGHT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
-                ctx.lineTo(RIGHT_CPU_ANIMATION.x, RIGHT_CPU_ANIMATION.y)
-                ctx.lineWidth = 10
-                ctx.stroke()
-                drawFingers(gameState[cpuIndex][0], RIGHT_CPU_ANIMATION.x, RIGHT_CPU_ANIMATION.y, FINGER_LENGTH, "black", ctx)
-                
-                ctx.beginPath();
-                ctx.arc(RIGHT_CPU_ANIMATION.x, RIGHT_CPU_ANIMATION.y, 10, 0, 2 * Math.PI)
-                ctx.fillStyle = "black"
-                ctx.fill()
-
-            } else {
-                //Draw computer left arm
-                ctx.beginPath();
-                ctx.moveTo(LEFT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
-                ctx.lineTo(LEFT_CPU_REST.x, LEFT_CPU_REST.y)
+                ctx.lineTo(LEFT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
                 ctx.lineWidth = 10
                 ctx.stroke()
 
-                //Draw computer left hand at rest coords                
-                drawFingers(gameState[cpuIndex][1], LEFT_CPU_REST.x, LEFT_CPU_REST.y, FINGER_LENGTH, "black", ctx)
-
-                ctx.beginPath();
-                ctx.arc(LEFT_CPU_REST.x, LEFT_CPU_REST.y, 10, 0, 2 * Math.PI)
-                ctx.fillStyle = "black"
-                ctx.fill()
-
-                //Draw computer right arm
-                ctx.beginPath();
-                ctx.moveTo(RIGHT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
-                ctx.lineTo(RIGHT_CPU_REST.x, RIGHT_CPU_REST.y)
+                //Draw body line
+                ctx.beginPath()
+                ctx.moveTo((RIGHT_REST.x + LEFT_REST.x) / 2, 0.5 * CANVAS_DIMENSIONS.y)
+                ctx.lineTo((RIGHT_REST.x + LEFT_REST.x) / 2, CANVAS_DIMENSIONS.y)
                 ctx.lineWidth = 10
                 ctx.stroke()
 
-                //Draw computer right hand at rest coords
-                drawFingers(gameState[cpuIndex][0], RIGHT_CPU_REST.x, RIGHT_CPU_REST.y, FINGER_LENGTH, "black", ctx)
+                //Draw neck
+                ctx.beginPath()
+                ctx.moveTo((RIGHT_REST.x + LEFT_REST.x) / 2, 0.5 * CANVAS_DIMENSIONS.y)
+                ctx.lineTo((RIGHT_REST.x + LEFT_REST.x) / 2, 0.375 * CANVAS_DIMENSIONS.y)
+                ctx.lineWidth = 10
+                ctx.stroke()
 
-                ctx.beginPath();
-                ctx.arc(RIGHT_CPU_REST.x, RIGHT_CPU_REST.y, 10, 0, 2 * Math.PI)
-                ctx.fillStyle = "black"
-                ctx.fill()
+                //Draw head
+                ctx.beginPath()
+                ctx.rect((RIGHT_REST.x + LEFT_REST.x) / 2 - 0.125 * CANVAS_DIMENSIONS.y, 0.125 * CANVAS_DIMENSIONS.y, 0.25 * CANVAS_DIMENSIONS.y, 0.25 * CANVAS_DIMENSIONS.y)
+                ctx.stroke()
             }
-
-            //Draw line connecting arms
-            ctx.beginPath()
-            ctx.moveTo(RIGHT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
-            ctx.lineTo(LEFT_REST.x, 0.5 * CANVAS_DIMENSIONS.y)
-            ctx.lineWidth = 10
-            ctx.stroke()
-
-            //Draw body line
-            ctx.beginPath()
-            ctx.moveTo((RIGHT_REST.x + LEFT_REST.x) / 2, 0.5 * CANVAS_DIMENSIONS.y)
-            ctx.lineTo((RIGHT_REST.x + LEFT_REST.x) / 2, CANVAS_DIMENSIONS.y)
-            ctx.lineWidth = 10
-            ctx.stroke()
-
-            //Draw neck
-            ctx.beginPath()
-            ctx.moveTo((RIGHT_REST.x + LEFT_REST.x) / 2, 0.5 * CANVAS_DIMENSIONS.y)
-            ctx.lineTo((RIGHT_REST.x + LEFT_REST.x) / 2, 0.375 * CANVAS_DIMENSIONS.y)
-            ctx.lineWidth = 10
-            ctx.stroke()
-
-            //Draw head
-            ctx.beginPath()
-            ctx.rect((RIGHT_REST.x + LEFT_REST.x) / 2 - 0.125 * CANVAS_DIMENSIONS.y, 0.125 * CANVAS_DIMENSIONS.y, 0.25 * CANVAS_DIMENSIONS.y, 0.25 * CANVAS_DIMENSIONS.y)
-            ctx.stroke()
         }
 
         //Draw next frame
@@ -788,12 +846,6 @@ window.onload = async () => {
                 REST_BUFFER = CANVAS_DIMENSIONS.x / 13
                 FINGER_LENGTH = CANVAS_DIMENSIONS.y / 8
 
-                //Scale animation distances
-                yChange = Math.abs(RIGHT_CPU_REST.y - RIGHT_REST.y) / ANIMATION_LENGTH
-                xChangeOpp = Math.abs(RIGHT_CPU_REST.x - LEFT_REST.x) / ANIMATION_LENGTH
-                xChangeSplit = (Math.abs(RIGHT_CPU_REST.x - LEFT_CPU_REST.x) / 2) / ANIMATION_LENGTH
-                xChangeSame = Math.abs(RIGHT_CPU_REST.x - RIGHT_REST.x) / ANIMATION_LENGTH
-
                 //Set text size
                 sheet.insertRule(`.fingerCount {font-size: ${canvas.width * 0.04}px;}`)
                 sheet.insertRule(`#announcementBanner {font-size: ${canvas.height * 0.09}px;}`)
@@ -804,6 +856,7 @@ window.onload = async () => {
                 setTimeout(() => {
                     requestAnimationFrame(canvasFrame)
                     banner.innerHTML = "Put your hands in the circles"
+                    startTime = Math.floor(Date.now() / 1000);
                 }, 1000)
             })
             .catch(error => { //Error handle
